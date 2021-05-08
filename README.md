@@ -13,3 +13,9 @@ samtools view test.bam | python fusion_caller.py --mode extractmates --outprefix
 ```python
 python fusion_caller.py --mode summarise --outprefix test
 ```
+
+### Requeriments
+Please install the dependencies required by running:<br>
+```bash
+pip install -r requirements.txt
+```
