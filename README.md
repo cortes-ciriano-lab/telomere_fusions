@@ -77,10 +77,10 @@ Alternative, one can pass the two files as input as follows:<br>
 ```python
 python fusion_caller.py --mode summarise --outprefix test --matesfile test_mates --fusionsfile test_fusions
 ```
-
-
 <br>
-### Requeriments
+
+## Requirements
+
 Please install the dependencies required by running:<br>
 ```python
 pip install -r requirements.txt
