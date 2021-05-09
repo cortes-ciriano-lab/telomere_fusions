@@ -82,6 +82,6 @@ python fusion_caller.py --mode summarise --outprefix test --matesfile test_mates
 <br>
 ### Requeriments
 Please install the dependencies required by running:<br>
-```sh
+```
 pip install -r requirements.txt
 ```
