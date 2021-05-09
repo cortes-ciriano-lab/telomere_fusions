@@ -27,6 +27,24 @@ def initialize_parser():
         choices = ["callfusions", "extractmates", "summarise"]
     )
     parser.add_argument(
+        '--readIDs',
+        help='File containing the IDs for the reads with telomere fusions identified after running using mode "callfusions"',
+        required=False,
+        default=None
+    )
+    parser.add_argument(
+        '--fusionsfile',
+        help='File containing the candidate fusions identified when running the mode callfusions',
+        required=False,
+        default=None
+    )
+    parser.add_argument(
+        '--matesfile',
+        help='File, generated when running the mode extractmates, containing the mates for the reads containing the candidate fusions identified when running the mode callfusions.',
+        required=False,
+        default=None
+    )
+    parser.add_argument(
         '--outprefix',
         help='Prefix for output files',
         required=False
@@ -67,7 +85,10 @@ Function to extract read mates
 '''
 def extract_mates(args):
     keep=[]
-    readIDs_file = "{}_readIDs".format(args.outprefix)
+    if args.readIDs is not None:
+        readIDs_file = args.readIDs
+    else:
+        readIDs_file = "{}_readIDs".format(args.outprefix)
     mates_out = open("{}_mates".format(args.outprefix),'a')
     readIDs = []
     
@@ -196,8 +217,15 @@ def main():
         extract_mates(args)
 
     if args.mode == "summarise":
-        fusions_file = "{}_fusions".format(args.outprefix)
-        mates_file = "{}_mates".format(args.outprefix)
+        if args.fusionsfile is None:
+            fusions_file = "{}_fusions".format(args.outprefix)
+        else:
+            fusions_file = args.fusionsfile
+        if args.matesfile is None:
+            mates_file = "{}_mates".format(args.outprefix)
+        else:
+            mates_file = args.matesfile
+
         try:
             path.exists(mates_file)
         except ValueError:
