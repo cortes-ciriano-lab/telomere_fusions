@@ -1,4 +1,4 @@
-## Step 1: extracting reads with telomere repeats (TTAGG) and inverted telomere repeats (CCCTAA) allowing for one mismatch
+## Step 1: extracting reads with telomere repeats (TTAGGG) and inverted telomere repeats (CCCTAA) allowing for one mismatch
 
 From a bam file passed via stdin<br>
 ```python
@@ -79,11 +79,43 @@ python fusion_caller.py --mode summarise --outprefix test --matesfile test_mates
 ```
 <br>
 
+## Step 4: quality control (QC) step 
+This script aims to filter potential false positives telomere fusions, mark endogenous regions of human genome prone to be confused by telomere fusions and check divide the fusions in different subtypes.<br>
+
+```R
+Rscript FusionReadsQC.R --summary_file test_fusions_summary --ref_genome Hg38 --project test --prefix QC/test
+```
+Output file:<br>
+QC/test.fusions.unfiltered.tsv: Updated summary file, with extra columns with the information used to perform the QC computation. It provides the QC decision for each read, as well as the reason because each read was filtered or not.<br>
+QC/test.fusions.pass.tsv: List of reads supporting telomere fusions that passed all QC filters (PASS reads from QC/test.fusions.unfiltered.tsv file).<br>
+QC/test.fusions.false_positives.tsv: List of reads supporting that did not pass the QC filters (Filtered reads from QC/test.fusions.unfiltered.tsv file).<br>
+QC/test.fusions.pass.collapsed.tsv: List of reads supporting telomere fusions (only PASS reads) collapsed by chromosome, middle sequence, and the different fusion subtype criteria for each sample separately.<br>
+QC/test.fusions.sample_stats.tsv: Summary table showing the number of reads supporting fusions found for each samples, as well as the reads of them that were filtered out.<br>
+QC/test.fusions.project_stats.tsv: Summary table showing the number of reads supporting fusions found for each project group, as well as the number of reads that were filtered out.<br>
+QCtest.fusions.QC.Rdata: R environment used in the computation (to be ignored by most of users).<br>
+
+
+## Step 5: middle sequence correction
+This script aims to correct the middle sequences of the telomere fusions to better distinguish the juntion point between the forward (TTAGGG) and reverse (CCCTAA) repeats of the telomeres fused.<br>
+
+```R
+Rscript CollapseCorrectFusions.R --summary_file_collapsed QC/test.fusions.pass.collapsed.tsv --prefix Collapsed_results/test
+```
+Output file:<br>
+Collapsed_results/Possible_middle_sequences.pure.tsv: All possible middle sequences that can be originated from the canonical fusion of two telomeres.<br>
+Collapsed_results/test.middle_correction_steps.tsv: Different steps of the error correction showing how the middle sequence of each fusion has been curated.<br>
+Collapsed_results/test.corrected.tsv: Final version of the telomere fusions obtained after middle correction. All fusions are collapsed by chromosome, middle sequence, and the different fusion subtype criteria (for each sample separately).<br>
+Collapsed_results/test.blacklisted_samples.tsv: Sample IDs listed in the blacklist based on the proportion of endogenous 9 fusion-like events showing the middle sequence TTAA.<br>
+Collapsed_results/test.proportion_correct_endo9.all_samples.pdf: Distribution of reads annoated in endogenous_9 showing the expected TTAA middle sequence (all samples).<br>
+Collapsed_results/test.proportion_correct_endo9.top100.pdf: Distribution of reads annoated in endogenous_9 showing the expected TTAA middle sequence (top 100 samples).<br>
+
 ## Requirements
 
 Please install the dependencies required by running:<br>
 ```python
 pip install -r requirements.txt
 ```
-
+```R
+Rscript r_requirements_install.R
+```
 
