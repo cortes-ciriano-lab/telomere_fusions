@@ -17,6 +17,7 @@ Rscript r_requirements_install.R
 <br>
 
 ## Step 1: extract sequencing coverage information
+
 The first step consists of extracting read alignment information using samtools flagstat.<br>
 ./coverage_info.sh test.bam test.cov
 
@@ -135,7 +136,7 @@ Output file:<br>
 - Collapsed_results/test.proportion_correct_endo9.top100.pdf: Distribution of reads annoated in endogenous_9 showing the expected TTAA middle sequence (top 100 samples).<br>
 
 
-# Contact
+## Contact
 Please contact us for further information or suggestions:<br>
 Francesc Muyas: fmuyas@ebi.ac.uk
 Isidro Cortes-Ciriano: icortes@ebi.ac.uk
