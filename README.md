@@ -19,7 +19,10 @@ Rscript r_requirements_install.R
 ## Step 1: extract sequencing coverage information
 
 The first step consists of extracting read alignment information using samtools flagstat.<br>
-./coverage_info.sh test.bam test.cov
+```
+sampleid=test
+./scripts/coverage_info.sh test.bam ${sampleid}.cov
+```
 
 Output file:<br>
 Read alignemnt information, which will be used in Step 4. 
@@ -28,7 +31,7 @@ Read alignemnt information, which will be used in Step 4.
 
 From a bam file passed via stdin<br>
 ```python
-samtools view test.bam | python fusion_caller.py --mode callfusions  --outprefix test
+samtools view test.bam | python scripts/fusion_caller.py --mode callfusions  --outprefix ${sampleid}
 ```
 Output files:<br>
 test_fusions: file containing reads with candidate telomere fusions<br>
@@ -39,29 +42,29 @@ If running in an HPC cluster, one might want to split the computation by e.g., c
 ```bash
 for chr in {1..22} X Y
 do
-bsub -o o.log -e e.log -J testjob -M 2G "samtools view test.bam ${chr} | python fusion_caller.py --mode callfusions  --outprefix test_${chr}"
+bsub -o o.log -e e.log -J ${sampleid}job -M 2G "samtools view test.bam ${chr} | python scripts/fusion_caller.py --mode callfusions  --outprefix ${sampleid}_${chr}"
 done
 # we also process unmapped reads:
-bsub -o o.log -e e.log -J testjob -M 2G "samtools view -f 4 test.bam | python fusion_caller.py --mode callfusions  --outprefix test_unmapped"
+bsub -o o.log -e e.log -J ${sampleid}job -M 2G "samtools view -f 4 test.bam | python scripts/fusion_caller.py --mode callfusions  --outprefix ${sampleid}_unmapped"
 ```
 
 When running in parallel, merge the read IDs into a single file:<br>
 ```bash
-touch test_readIDs
+touch ${sampleid}_readIDs
 for chr in {1..22} X Y unmapped
 do
-cat test_${chr}_readIDs >> test_readIDs
+cat ${sampleid}_${chr}_readIDs >> ${sampleid}_readIDs
 done
 ```
 <br>
 
 ## Step 3: extract the mates for the reads containing candidate telomere fusions
 ```python
-samtools view test.bam | python fusion_caller.py --mode extractmates --outprefix test
+samtools view test.bam | python scripts/fusion_caller.py --mode extractmates --outprefix ${sampleid}
 ```
 When splitting the calculation by chromosome in step 1, pass as input the file containing the IDs for all reads across all chromsomes with potential telomere fusions.<br>
 ```python
-samtools view test.bam | python fusion_caller.py --mode extractmates --outprefix test --readIDs test_readIDs
+samtools view test.bam | python scripts/fusion_caller.py --mode extractmates --outprefix ${sampleid} --readIDs ${sampleid}_readIDs
 ```
 Output file:<br>
 test_mates: file containing the mate reads for the reads with candidate fusions identified in step 1.<br>
@@ -71,25 +74,25 @@ Step 3 can also be run on a per chromosome basis as follows:
 ```bash
 for chr in {1..22} X Y
 do
-bsub -o o.log -e e.log -J testjob -M 2G "samtools view test.bam ${chr} | python fusion_caller.py --mode extractmates  --outprefix test_${chr}"
+bsub -o o.log -e e.log -J ${sampleid}job -M 2G "samtools view test.bam ${chr} | python scripts/fusion_caller.py --mode extractmates  --outprefix ${sampleid}_${chr}"
 done
 # we also process unmapped reads:
-bsub -o o.log -e e.log -J testjob -M 2G "samtools view -f 4 test.bam | python fusion_caller.py --mode extractmates  --outprefix test_unmapped"
+bsub -o o.log -e e.log -J ${sampleid}job -M 2G "samtools view -f 4 test.bam | python scripts/fusion_caller.py --mode extractmates  --outprefix ${sampleid}_unmapped"
 ```
 
 When running in parallel, merge the read IDs into a single file:<br>
 ```bash
-touch test_mates
+touch ${sampleid}_mates
 for chr in {1..22} X Y unmapped
 do
-cat test_${chr}_mates >> test_mates
+cat ${sampleid}_${chr}_mates >> ${sampleid}_mates
 done
 ```
 <br>
 
 ## Step 4: generate a summary file containing the fusions and additional information
 ```python
-python fusion_caller.py --mode summarise --outprefix test --alignmentinfo test.cov
+python scripts/fusion_caller.py --mode summarise --outprefix ${sampleid} --alignmentinfo ${sampleid}.cov
 ```
 Output file:<br>
 test_fusions_summary: file reporting candidate fusions, and information about both reads the pair.<br>
@@ -101,7 +104,7 @@ Note that these two files are expected to start with the prefix passed to the op
 <br>
 Alternative, one can pass the two files as input as follows:<br>
 ```python
-python fusion_caller.py --mode summarise --outprefix test --matesfile test_mates --fusionsfile test_fusions
+python scripts/fusion_caller.py --mode summarise --outprefix ${sampleid} --matesfile ${sampleid}_mates --fusionsfile ${sampleid}_fusions
 ```
 <br>
 
@@ -109,7 +112,7 @@ python fusion_caller.py --mode summarise --outprefix test --matesfile test_mates
 This script provides functionalities to filter potential false positive telomere fusions, flag reads clearly mapping to regions of human genome containing telomere-like patterns (such as the relic of an ancestral telomere fusion in chr2), and further classify the fusions detected into categories according to the patters of repeats detected.<br>
 
 ```R
-Rscript FusionReadsQC.R --summary_file test_fusions_summary --ref_genome Hg38 --project test --prefix QC/test
+Rscript FusionReadsQC.R --summary_file ${sampleid}_fusions_summary --ref_genome Hg38 --project ${sampleid} --prefix QC/${sampleid}
 ```
 Output file:<br>
 - QC/test.fusions.unfiltered.tsv: Updated summary file, with extra columns with the information used to perform the QC computation. It provides the QC decision for each read, as well as the reason because each read was filtered or not.<br>
@@ -125,7 +128,7 @@ Output file:<br>
 This script corrects the breakpoint sequences of the telomere fusions detected. The breakpoint sequence of a telomere fusion is the sequence flanked by the forward (TTAGGG) and reverse (CCCTAA) repeats.<br>
 
 ```R
-Rscript CollapseCorrectFusions.R --summary_file_collapsed QC/test.fusions.pass.collapsed.tsv --prefix Collapsed_results/test
+Rscript CollapseCorrectFusions.R --summary_file_collapsed QC/${sampleid}.fusions.pass.collapsed.tsv --prefix Collapsed_results/${sampleid}
 ```
 Output file:<br>
 - Collapsed_results/Possible_middle_sequences.pure.tsv: All possible middle sequences that can be originated from the canonical fusion of two telomeres.<br>
