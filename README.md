@@ -1,4 +1,28 @@
-## Step 1: extracting reads with telomere repeats (TTAGGG) and inverted telomere repeats (CCCTAA) allowing for one mismatch
+# Detection of telomere fusions using sequencing data
+This repository provides functionalities for the detection of telomere fusions using whole-genome sequencing data.
+The pipeline, which is split into the 6 steps described below, requires an aligned bam file as input and a sample/run ID, which is used as prefix in the output files. For illustration ppurposes, we use below "test" as sample ID. 
+We provide a test bam file ("test.bam") with the repository for testing purposes.<br>
+The code can be run serially. However, for large files we recommend to run steps 2 and 3 below in parallel using subsets of the data as input (e.g. performing the analyses on a per chromosome basis).<br>
+
+## Installation and requirements
+The code requires python version >=3.7.0 and R version >=3.5.0.
+
+Please install the dependencies required by running:<br>
+```python
+pip install -r requirements.txt
+```
+```R
+Rscript r_requirements_install.R
+```
+
+## Step 1: extract sequencing coverage information
+The first step consists of extracting read alignment information using samtools flagstat.<br>
+./coverage_info.sh test.bam test.cov
+
+Output file:<br>
+Read alignemnt information, which will be used in Step 4. 
+
+## Step 2: extracting reads with telomere repeats (TTAGGG) and inverted telomere repeats (CCCTAA) allowing for one mismatch
 
 From a bam file passed via stdin<br>
 ```python
@@ -29,7 +53,7 @@ done
 ```
 <br>
 
-## Step 2: extract the mates for the reads containing candidate telomere fusions
+## Step 3: extract the mates for the reads containing candidate telomere fusions
 ```python
 samtools view test.bam | python fusion_caller.py --mode extractmates --outprefix test
 ```
@@ -41,7 +65,7 @@ Output file:<br>
 test_mates: file containing the mate reads for the reads with candidate fusions identified in step 1.<br>
 <br>
 
-Step 2 can also be run on a per chromosome basis as follows:
+Step 3 can also be run on a per chromosome basis as follows:
 ```bash
 for chr in {1..22} X Y
 do
@@ -61,9 +85,9 @@ done
 ```
 <br>
 
-## Step 3: generate a summary file containing the fusions and additional information
+## Step 4: generate a summary file containing the fusions and additional information
 ```python
-python fusion_caller.py --mode summarise --outprefix test
+python fusion_caller.py --mode summarise --outprefix test --alignmentinfo test.cov
 ```
 Output file:<br>
 test_fusions_summary: file reporting candidate fusions, and information about both reads the pair.<br>
@@ -79,8 +103,8 @@ python fusion_caller.py --mode summarise --outprefix test --matesfile test_mates
 ```
 <br>
 
-## Step 4: quality control (QC) step 
-This script aims to filter potential false positives telomere fusions, mark endogenous regions of human genome prone to be confused by telomere fusions and check divide the fusions in different subtypes.<br>
+## Step 5: quality control (QC) step 
+This script provides functionalities to filter potential false positive telomere fusions, flag reads clearly mapping to regions of human genome containing telomere-like patterns (such as the relic of an ancestral telomere fusion in chr2), and further classify the fusions detected into categories according to the patters of repeats detected.<br>
 
 ```R
 Rscript FusionReadsQC.R --summary_file test_fusions_summary --ref_genome Hg38 --project test --prefix QC/test
@@ -95,8 +119,8 @@ Output file:<br>
 - QCtest.fusions.QC.Rdata: R environment used in the computation (to be ignored by most of users).<br>
 
 
-## Step 5: middle sequence correction
-This script aims to correct the middle sequences of the telomere fusions to better distinguish the juntion point between the forward (TTAGGG) and reverse (CCCTAA) repeats of the telomeres fused.<br>
+## Step 6: middle sequence correction
+This script corrects the breakpoint sequences of the telomere fusions detected. The breakpoint sequence of a telomere fusion is the sequence flanked by the forward (TTAGGG) and reverse (CCCTAA) repeats.<br>
 
 ```R
 Rscript CollapseCorrectFusions.R --summary_file_collapsed QC/test.fusions.pass.collapsed.tsv --prefix Collapsed_results/test
@@ -109,13 +133,8 @@ Output file:<br>
 - Collapsed_results/test.proportion_correct_endo9.all_samples.pdf: Distribution of reads annoated in endogenous_9 showing the expected TTAA middle sequence (all samples).<br>
 - Collapsed_results/test.proportion_correct_endo9.top100.pdf: Distribution of reads annoated in endogenous_9 showing the expected TTAA middle sequence (top 100 samples).<br>
 
-## Requirements
 
-Please install the dependencies required by running:<br>
-```python
-pip install -r requirements.txt
-```
-```R
-Rscript r_requirements_install.R
-```
-
+# Contact
+Please contact us for further information or suggestions:<br>
+Francesc Muyas: fmuyas@ebi.ac.uk
+Isidro Cortes-Ciriano: icortes@ebi.ac.uk

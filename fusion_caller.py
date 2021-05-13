@@ -40,9 +40,15 @@ def initialize_parser():
     )
     parser.add_argument(
         '--matesfile',
-        help='File, generated when running the mode extractmates, containing the mates for the reads containing the candidate fusions identified when running the mode callfusions.',
+        help='File generated when running the mode extractmates, containing the mates for the reads containing the candidate fusions identified when running the mode callfusions',
         required=False,
         default=None
+    )
+    parser.add_argument(
+        '--alignmentinfo',
+        help='File generated when running coverage_info.sh and containing read alignemnt information',
+        required=False,
+        default=" "
     )
     parser.add_argument(
         '--outprefix',
@@ -62,8 +68,8 @@ def extract_fusions(args):
     tot=0
     forwardtwice="TTAGGGTTAGGG"
     reversetwice="CCCTAACCCTAA"
-    fusions_out = open("{}_fusions".format(args.outprefix),'a')
-    readIDs_out = open("{}_readIDs".format(args.outprefix),'a')
+    fusions_out = open("{}_fusions".format(args.outprefix),'w+')
+    readIDs_out = open("{}_readIDs".format(args.outprefix),'w+')
     for line in fileinput.input(args.reads):
         line = line.split("\t")
         # matching forward
@@ -89,7 +95,7 @@ def extract_mates(args):
         readIDs_file = args.readIDs
     else:
         readIDs_file = "{}_readIDs".format(args.outprefix)
-    mates_out = open("{}_mates".format(args.outprefix),'a')
+    mates_out = open("{}_mates".format(args.outprefix),'w+')
     readIDs = []
     
     with open(readIDs_file,'r') as file:
@@ -122,7 +128,7 @@ def summarise(fusions_file, mates_file, args):
     
     reads_visited=[]
 
-    summary_out = open("{}_fusions_summary".format(args.outprefix),'a')
+    summary_out = open("{}_fusions_summary".format(args.outprefix),'w+')
     
     with open(fusions_file) as line_in:
         for line in line_in:
@@ -196,8 +202,19 @@ def summarise(fusions_file, mates_file, args):
             else:
                 global count
                 count=line[0].strip("\n")
+    # load read alignemnt information
+    with open(args.alignmentinfo,'r') as file:
+        for line in file:
+            line=line.split(",")
+            Path_file=line[0]
+            File=line[1]
+            Total_reads=line[2]
+            Supplementary_reads=line[3]
+            Duplicate_reads=line[4]
+            Paired_reads=line[5]
+
     for i,x in enumerate(output):
-        summary_out.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format("\t".join(x[0][:-2]).strip("\n"),x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9],x[10],x[11],x[12],x[13],x[14],x[15],x[16],x[17],count,args.outprefix))
+        summary_out.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format("\t".join(x[0][:-2]).strip("\n"),x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9],x[10],x[11],x[12],x[13],x[14],x[15],x[16],x[17],count,args.outprefix,Path_file,File,Total_reads,Supplementary_reads,Duplicate_reads,Paired_reads))
     summary_out.close()
     
     
@@ -226,14 +243,13 @@ def main():
         else:
             mates_file = args.matesfile
 
-        try:
-            path.exists(mates_file)
-        except ValueError:
-            print("File with read mates does not exist")
-        try:
-            path.exists(fusions_file)
-        except ValueError:
-            print("File with telomere fusions does not exist")
+        if not  path.exists(args.alignmentinfo):
+            raise  FileNotFoundError("File with coverage information does not exist")
+        if not path.exists(mates_file):
+            raise ValueError("File with read mates does not exist")
+        if not path.exists(fusions_file):
+            raise ValueError("File with telomere fusions does not exist")
+
         summarise(fusions_file,mates_file,args) 
 
 if __name__ == '__main__':
