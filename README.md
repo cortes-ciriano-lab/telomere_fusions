@@ -1,6 +1,6 @@
 # Detection of telomere fusions using sequencing data
 This repository provides functionalities for the detection of telomere fusions using whole-genome sequencing data.
-The pipeline, which is split into the 6 steps described below, requires an aligned bam file as input and a sample/run ID, which is used as prefix in the output files. For illustration ppurposes, we use below "test" as sample ID. 
+The pipeline, which is split into the 6 steps described below, requires an aligned bam file as input and a sample/run ID, which is used as prefix in the output files. For illustration purposes, we use below "test" as sample ID. 
 We provide a test bam file ("test.bam") with the repository for testing purposes.<br>
 The code can be run serially. However, for large files we recommend to run steps 2 and 3 below in parallel using subsets of the data as input (e.g. performing the analyses on a per chromosome basis).<br>
 
@@ -14,8 +14,9 @@ pip install -r requirements.txt
 ```R
 Rscript r_requirements_install.R
 ```
+<br>
 
-## Step 1: extract sequencing coverage information
+## Step 1: extract sequencing coverage information
 The first step consists of extracting read alignment information using samtools flagstat.<br>
 ./coverage_info.sh test.bam test.cov
 
