@@ -175,7 +175,7 @@ def summarise(fusions_file, mates_file, args):
     
                             matches_forward = regex.findall(forward, mate[9])
                             matches_reverse = regex.findall(reverse, mate[9])
-                            match_telo="No\t \t "
+                            match_telo="No\t0\t0"
                             if len(matches_forward)>1 or  len(matches_reverse) >1: 
                                 match_telo="Yes\t{}\t{}".format(len(matches_forward), len(matches_reverse) )
     
@@ -193,7 +193,7 @@ def summarise(fusions_file, mates_file, args):
                             
                             matches_forward = regex.findall(forward, mate[9])
                             matches_reverse = regex.findall(reverse, mate[9])
-                            match_telo="No\t \t "
+                            match_telo="No\t0\t0"
                             if len(matches_forward)>0 or  len(matches_reverse) >0: 
                                 match_telo="Yes\t{}\t{}".format(len(matches_forward), len(matches_reverse) )
                             if line[9][0:30] not in reads_visited:
@@ -205,6 +205,7 @@ def summarise(fusions_file, mates_file, args):
     # load read alignemnt information
     with open(args.alignmentinfo,'r') as file:
         for line in file:
+            line=line.strip("\n")
             line=line.split(",")
             Path_file=line[0]
             File=line[1]

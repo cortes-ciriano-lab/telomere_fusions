@@ -144,43 +144,24 @@ MARK_ENDO_REGION <- function(DATA,CHROM,MIN_COORDINATE,MAX_COORDINATE,Flag_endo,
 }
 
 # Main function to run Quality Control (QC) step with summary files 
-MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE){
+MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   # Initial print
   cat("\n")
   print("___")
   print(paste0('Project: ', project))
   
-  
   # Load project file and add header
-  d0 = as.data.frame(fread(cmd = paste0("awk -F'\t' '{if (NF == 29) print $0}' ", file), sep = '\t', header = F))
-  if (nrow(d0) > 0){
-    d0 <- add_column(d0, extra2 = 0, .after = "V27")
-    d0 <- add_column(d0, extra1 = 0, .after = "V27")
-    names(d0) <- HEADER
-  }
-  
-  # Load project file and add header
-  d1 = as.data.frame(fread(cmd = paste0("awk -F'\t' '{if (NF == 31) print $0}' ", file), sep = '\t', header = F))
-  if (nrow(d1) > 0){
-    names(d1) <- HEADER
-  }
-  
-  # Remove extra columns
-  d2 = as.data.frame(fread(cmd = paste0("awk -F'\t' '{if (NF == 33) print $0}' ", file), sep = '\t', header = F))
-  if (nrow(d2 > 0)){
-    d2$V28 <- NULL
-    d2$V29 <- NULL
-    colnames(d2) <- colnames(d1)
+  d = as.data.frame(fread(file, sep = '\t', header = F))
+  if (nrow(d) > 0){
+    names(d) <- HEADER
   }
   
   # Check if empty files
-  d <- rbind(d0,d1, d2)
   if (nrow(d) < 1){
     print(paste0('Warning: ',project, ' files are empty or not readable for the tool'))
     return(list(fusions = NULL, stats = NULL))
   }
-  names(d) <- HEADER
-  
+
   # Clean sample name
   d$sample = gsub( "_rawFus_full_chr[0-9]_python.fq", "", d$sample)
   d$sample = gsub( "_rawFus_full_chrX_python.fq", "", d$sample)
@@ -590,14 +571,31 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE){
       )
       
       # Final print
-      READ_length_mean <- round(mean(nchar(dd$SEQ), na.rm = T),2)
+      Read_lengths <- c(nchar(dd[!is.na(dd$SEQ),]$SEQ),nchar(dd[!is.na(dd$SEQ) & !is.na(dd$MAPQ_mate),]$SEQ))
+      READ_length_mean <- round(mean(Read_lengths, na.rm = T),2)
+      READ_length_approx <- round_any(READ_length_mean - 1, 5, ceiling)
       print (paste0('Number of samples with fusions: ', length(unique(dd$sample))))
       print (paste0('Number of original fusion calls: ', nrow(dd)))
       print (paste0('Number of pass fusion calls: ', sum(dd$PASS == 'PASS')))
       print (paste0('Number of potential false positives: ', sum(dd$PASS != 'PASS')))
       
+      # Add read_length and calculate coverage
+      if (is.null(read_length)){
+        dd$read_length <- READ_length_approx
+      } else {
+        dd$read_length <- read_length
+      }
+      
+      # Calculate coverage
+      dd$Total_reads <- as.numeric(dd$Total_reads)
+      dd$Supplementary_reads <- as.numeric(dd$Supplementary_reads)
+      dd$Duplicate_reads <- as.numeric(dd$Duplicate_reads)
+      dd$Total_reads_used <- dd$Total_reads - dd$Supplementary_reads - dd$Duplicate_reads
+      
+      dd$coverage <- dd$read_length*dd$Total_reads_used/3000000000
+      
       # Filtering data.frame
-      STATS_temp <- data.frame(project = project, N_samples_with_fusions = length(unique(dd$sample)), Mean_read_length = READ_length_mean, raw_fusion_reads = nrow(dd),
+      STATS_temp <- data.frame(project = project, N_samples_with_fusions = length(unique(dd$sample)), Mean_read_length = READ_length_mean, Read_length_approx = READ_length_approx, raw_fusion_reads = nrow(dd),
                                pass_fusion_reads = sum(dd$PASS == 'PASS'), fp_fusion_reads = sum(dd$PASS != 'PASS'), markduplicates = CHECK)
     }
   } else {
@@ -661,7 +659,12 @@ HEADER = c(
   "forward_mate",
   "reverse_mate",
   "total_count",
-  "sample"
+  "sample",
+  "Path_file",
+  "File","Total_reads",
+  "Supplementary_reads",
+  "Duplicate_reads",
+  "Paired_reads"
 )
 
 
@@ -678,25 +681,24 @@ parser <- ArgumentParser()
 # setting parameters
 parser$add_argument("-summary_file", "--summary_file", type="character", help="Summary file with fusions", metavar="file", required=T)
 parser$add_argument("-ref_genome", "--ref_genome", choices=c('Hg19', 'Hg38'), type="character", help="Reference genome used for mapping", nargs=1, required=T)
-parser$add_argument("-project", "--project", default='Project',help="Project Id to be used", nargs=1, required=F)
-parser$add_argument("-prefix", "--prefix", default = NULL, help="Prefix id of the out files. It can contain the folder path", nargs=1, required=F)
+parser$add_argument("-outprefix", "--outprefix", help="Prefix id of the out files. It can contain the folder path", nargs=1, required=T)
+parser$add_argument("-read_length", "--read_length", type="integer",help="Read length used for sequencing. If not provided, it will be estimated from summary file", nargs=1, required=F)
 
 # 1. Reading parameters
 args <- parser$parse_args()
 
 file <- args$summary_file
 REFERENCE <- args$ref_genome
-project <- args$project
-prefix <- args$prefix
+prefix <- args$outprefix
+read_length <- args$read_length
 
-if (is.null(prefix)){
-  prefix <- paste('.',project, sep = '/')
-}
+# Get project ID - obtained from prefix
+project <- basename(prefix)
 
 # 2. Running main function
 if (file.exists(file)){
   # Run tool
-  RESULTS <- MAIN_FUNCTION_FUSION_QC(file, project,REFERENCE)
+  RESULTS <- MAIN_FUNCTION_FUSION_QC(file, project,REFERENCE,read_length)
   fusions <- RESULTS$fusions
   stats <- RESULTS$stats
   
@@ -740,7 +742,10 @@ if (!is.null(fusions)){
   
   # 3.6: Collapsed events
   out6 <- paste(prefix,'.fusions.pass.collapsed.tsv',sep = '')
-  all = ddply(PASS, .(chr_final,label,sample,project,Subtype,type_fus,orientation,middle), summarise, n=length(SEQ))
+  all = ddply(PASS, .(chr_final,label,sample,project,Subtype,type_fus,
+                      orientation,middle,Total_reads,Supplementary_reads,
+                      Duplicate_reads,Paired_reads,Total_reads_used,
+                      read_length, coverage), summarise, n=length(SEQ))
   colnames(all)[1] <- 'chr'
   write.table(x = all, file = out6, sep = '\t', quote = F, row.names = F, col.names = T)
   

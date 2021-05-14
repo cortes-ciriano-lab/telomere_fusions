@@ -738,6 +738,10 @@ SearchBlacklistSamples <- function(telo_corrected, cutoff,min_endo9,prefix){
     # Mark blacklist samples
     BLACKLIST <- ENDO_AGG[(ENDO_AGG$ENDO_CORRECT < cutoff | ENDO_AGG$n < min_endo9) & !ENDO_AGG$project %in% c('Maciejowski_2020_NatGen','Nat2020','Cleal2019','Cell2015'),]
     telo_corrected$blacklist <- (telo_corrected$sample %in% BLACKLIST$sample)*1
+    ENDO_AGG$blacklist <- (ENDO_AGG$sample %in% BLACKLIST$sample)*1
+    
+    outfile_x <- paste(prefix, '.proportion_correct_endo9.all_samples.tsv', sep = '')
+    write.table(x = ENDO_AGG, file = outfile_x,sep = '\t', quote = F, row.names = F, col.names = T)
     
     # General view of endo9 TTAA proportion distribution
     Proportion_ENDO_CORRECT_PLOT <- ggplot(ENDO_AGG, aes (x = sample, y = ENDO_CORRECT)) + 
@@ -765,8 +769,10 @@ SearchBlacklistSamples <- function(telo_corrected, cutoff,min_endo9,prefix){
     # Out plot 2
     outplot2 <- paste(prefix, '.proportion_correct_endo9.top100.pdf', sep = '')
     ggplot2::ggsave(plot = Proportion_ENDO_CORRECT_TOP100_PLOT, filename = outplot2, device = 'pdf', useDingbats=FALSE, height = 10, width = 15)
+  } else{
+    print (paste0('Warning!!: Not endo9 fusions found in the samples. All marked as 1 in blacklist column. We should observe endo9 fusions in human samples'))
+    telo_corrected$blacklist <- 1
   }
-  
   return(telo_corrected)
 }
 
@@ -805,8 +811,7 @@ parser <- ArgumentParser()
 
 # setting parameters
 parser$add_argument("-summary_file_collapsed", "--summary_file_collapsed", type="character", help="Summary file with fusions", metavar="file", required=T)
-parser$add_argument("-project", "--project", default='Project',help="Project Id to be used", nargs=1, required=F)
-parser$add_argument("-prefix", "--prefix", default = NULL, help="Prefix id of the out files. It can contain the folder path", nargs=1, required=F)
+parser$add_argument("-outprefix", "--outprefix", default = NULL, help="Prefix id of the out files. It can contain the folder path", nargs=1, required=T)
 parser$add_argument("-endo9_prop", "--endo9_prop", default = 0.9, help="Minimum proportion of TTAA reads found in endo 9 region [Default: 0.9]", nargs=1, required=F)
 parser$add_argument("-min_endo9", "--min_endo9", default = 5, help="Minimum number of reads mapping in endo9 region [Default: 5]", nargs=1, required=F)
 
@@ -814,14 +819,12 @@ parser$add_argument("-min_endo9", "--min_endo9", default = 5, help="Minimum numb
 args <- parser$parse_args()
 
 file <- args$summary_file
-project <- args$project
-prefix <- args$prefix
-cutoff <- args$endo9_prop
-min_endo9 <- args$min_endo9
+prefix <- args$outprefix
+cutoff <- as.numeric(args$endo9_prop)
+min_endo9 <- as.numeric(args$min_endo9)
 
-if (is.null(prefix)){
-  prefix <- paste('.',project, sep = '/')
-}
+# Get project ID - obtained from prefix
+project <- basename(prefix)
 
 # 1. Create out folder
 outf <- dirname(prefix)
@@ -861,8 +864,15 @@ if (nrow(telo) > 0){
   write.table(x = telo_corrected2, file = outfile2,sep = '\t', quote = F, row.names = F, col.names = T)
   
   # 8. Save collapsed fusions
-  collapsed_fusion <- aggregate(cbind(n,n_with_correction,n_with_more_than_1_solution) ~ chr + sample + project + type_fus + orientation + type6 + Subtype + middle6  + blacklist, data = telo_corrected2, sum) 
-  colnames(collapsed_fusion) <- c("chr", "sample","project", "region_type", "orientation","type", "Subtype","middle","blacklist","n","n_with_correction","n_with_more_than_1_solution")
+  telo_corrected2$middle_len <- nchar(telo_corrected2$middle6)
+  collapsed_fusion <- aggregate(cbind(n,n_with_correction,n_with_more_than_1_solution) ~ chr + sample + project + type_fus + 
+                                  orientation + type6 + Subtype + middle6  + middle_len + blacklist +
+                                  Total_reads+ Supplementary_reads + Duplicate_reads + Paired_reads + Total_reads_used +
+                                  read_length + coverage, data = telo_corrected2, sum)
+  colnames(collapsed_fusion) <- c("chr", "sample","project", "region_type", "orientation","type", "Subtype",
+                                  "middle","middle_len","blacklist","Total_reads","Supplementary_reads","Duplicate_reads",
+                                  "Paired_reads","Total_reads_used","read_length", "coverage",
+                                  "n","n_with_correction","n_with_more_than_1_solution")
   collapsed_fusion$middle_len <- nchar(collapsed_fusion$middle)
   
   outfile3 <- paste(prefix, '.corrected.tsv', sep = '')
