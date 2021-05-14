@@ -740,39 +740,21 @@ SearchBlacklistSamples <- function(telo_corrected, cutoff,min_endo9,prefix){
     telo_corrected$blacklist <- (telo_corrected$sample %in% BLACKLIST$sample)*1
     ENDO_AGG$blacklist <- (ENDO_AGG$sample %in% BLACKLIST$sample)*1
     
-    outfile_x <- paste(prefix, '.proportion_correct_endo9.all_samples.tsv', sep = '')
-    write.table(x = ENDO_AGG, file = outfile_x,sep = '\t', quote = F, row.names = F, col.names = T)
-    
-    # General view of endo9 TTAA proportion distribution
-    Proportion_ENDO_CORRECT_PLOT <- ggplot(ENDO_AGG, aes (x = sample, y = ENDO_CORRECT)) + 
-      geom_bar(stat = 'identity', alpha = 0.80, size = 0.1) + 
-      ylim(0,1)+
-      geom_hline(yintercept=cutoff, linetype="dashed", color = "red") +
-      common_ggplot2 +
-      labs (y = 'Proportion of TTAA (after correction) middle sequences', x = 'Samples') +
-      theme(axis.text.x=element_blank())
-    
-    # General view of endo9 TTAA proportion distribution (top 100 samples)
-    Proportion_ENDO_CORRECT_TOP100_PLOT <- ggplot(ENDO_AGG[ENDO_AGG$sample %in% head(ENDO_AGG$sample, 100) & ENDO_AGG$n >= 5,], aes (x = sample, y =ENDO_CORRECT, fill = project)) + 
-      geom_bar(stat = 'identity', color = 'white', width = 0.80) + 
-      common_ggplot2 +
-      ylim(0,1)+
-      geom_hline(yintercept=cutoff, linetype="dashed", color = "red") +
-      labs (y = 'Proportion of TTAA (after correction) middle sequences', x = 'Samples') +
-      theme(axis.text.x = element_text(angle=90, hjust = 1, vjust = 0.5),
-            plot.margin = margin(10, 10, 10, 10)) 
-    
-    # Out plot 1
-    outplot1 <- paste(prefix, '.proportion_correct_endo9.all_samples.pdf', sep = '')
-    ggplot2::ggsave(plot = Proportion_ENDO_CORRECT_PLOT, filename = outplot1, device = 'pdf', useDingbats=FALSE, height = 5, width = 10)
-    
-    # Out plot 2
-    outplot2 <- paste(prefix, '.proportion_correct_endo9.top100.pdf', sep = '')
-    ggplot2::ggsave(plot = Proportion_ENDO_CORRECT_TOP100_PLOT, filename = outplot2, device = 'pdf', useDingbats=FALSE, height = 10, width = 15)
   } else{
     print (paste0('Warning!!: Not endo9 fusions found in the samples. All marked as 1 in blacklist column. We should observe endo9 fusions in human samples'))
+    ENDO_AGG <- SAMPLES
+    ENDO_AGG$n <- 0
+    ENDO_AGG$n_TTAA_ENDO
+    ENDO_AGG$ENDO_CORRECT0
+    ENDO_AGG$blacklist <- 0
     telo_corrected$blacklist <- 1
   }
+  
+  # Write table with correct endo proportions
+  ENDO_AGG$Count <- 0
+  outfile_x <- paste(prefix, '.proportion_correct_endo9.tsv', sep = '')
+  write.table(x = ENDO_AGG, file = outfile_x,sep = '\t', quote = F, row.names = F, col.names = T)
+  
   return(telo_corrected)
 }
 
@@ -853,8 +835,6 @@ if (nrow(telo) > 0){
   # 6. Save blacklist samples
   if ("blacklist" %in% colnames(telo_corrected2)){
     BLACKLIST <- unique(telo_corrected2[telo_corrected2$blacklist == 1, c('sample','project')])
-    outfile1 <- paste(prefix, '.blacklisted_samples.tsv', sep = '')
-    write.table(BLACKLIST, file = outfile1, sep = '\t', col.names = T, row.names = F, quote = F)
   } else {
     telo_corrected2$blacklist <- 0
   }

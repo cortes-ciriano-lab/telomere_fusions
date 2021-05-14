@@ -725,11 +725,6 @@ if (!is.null(fusions)){
   FP <- fusions[fusions$PASS != 'PASS',]
   write.table(x = FP, file = out3, sep = '\t', quote = F, row.names = F, col.names = T)
   
-  # 3.4: Write stats
-  out4 <- paste(prefix,'.fusions.project_stats.tsv',sep = '')
-  stats$Prop_pass <- stats$pass_fusion_reads/stats$raw_fusion_reads
-  write.table(x = stats, file = out4, sep = '\t', quote = F, row.names = F, col.names = T)
-  
   # 3.5: Stats per sample
   out5 <- paste(prefix,'.fusions.sample_stats.tsv',sep = '')
   fusions$PASS <- (fusions$PASS == 'PASS')*1

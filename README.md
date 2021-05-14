@@ -120,7 +120,6 @@ Output file:<br>
 - QC/test.fusions.false_positives.tsv: List of reads supporting that did not pass the QC filters (Filtered reads from QC/test.fusions.unfiltered.tsv file).<br>
 - QC/test.fusions.pass.collapsed.tsv: List of reads supporting telomere fusions (only PASS reads) collapsed by chromosome, middle sequence, and the different fusion subtype criteria for each sample separately.<br>
 - QC/test.fusions.sample_stats.tsv: Summary table showing the number of reads supporting fusions found for each samples, as well as the reads of them that were filtered out.<br>
-- QC/test.fusions.project_stats.tsv: Summary table showing the number of reads supporting fusions found for each project group, as well as the number of reads that were filtered out.<br>
 - QCtest.fusions.QC.Rdata: R environment used in the computation (to be ignored by most of users).<br>
 
 
@@ -134,11 +133,7 @@ Output file:<br>
 - Collapsed_results/Possible_middle_sequences.pure.tsv: All possible middle sequences that can be originated from the canonical fusion of two telomeres.<br>
 - Collapsed_results/test.middle_correction_steps.tsv: Different steps of the error correction showing how the middle sequence of each fusion has been curated.<br>
 - Collapsed_results/test.corrected.tsv: Final version of the telomere fusions obtained after middle correction. All fusions are collapsed by chromosome, middle sequence, and the different fusion subtype criteria (for each sample separately).<br>
-- Collapsed_results/test.blacklisted_samples.tsv: Sample IDs listed in the blacklist based on the proportion of endogenous 9 fusion-like events showing the middle sequence TTAA.<br>
-- Collapsed_results/test.proportion_correct_endo9.all_samples.pdf: Distribution of reads annotated in endogenous_9 showing the expected TTAA middle sequence (all samples).<br>
-- Collapsed_results/test.proportion_correct_endo9.all_samples.tsv: Values plotted in Collapsed_results/test.proportion_correct_endo9.all_samples.pdf.<br>
-- Collapsed_results/test.proportion_correct_endo9.top100.pdf: Distribution of reads annotated in endogenous_9 showing the expected TTAA middle sequence (top 100 samples).<br>
-
+- Collapsed_results/test.proportion_correct_endo9.tsv: Table showing the proportion of reads annotated in endogenous_9 showing the expected TTAA middle sequence. It has as well the blacklist label information.<br>
 
 ## Contact
 Please contact us for further information or suggestions:<br>
