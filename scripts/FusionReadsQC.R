@@ -162,6 +162,8 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
     return(list(fusions = NULL, stats = NULL))
   }
 
+  d <- unique(d)
+  
   # Clean sample name
   d$sample = gsub( "_rawFus_full_chr[0-9]_python.fq", "", d$sample)
   d$sample = gsub( "_rawFus_full_chrX_python.fq", "", d$sample)
@@ -391,7 +393,7 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   # Get potential false positives
   # Not in endogenous regions, mapped perfectly in non-telomeric regions (middle of chromosomes)
   # We check afterwards if mates map to sub-telomeric regions
-  idx = which(dd$telo_repeats_mate == "No" & dd$MAPQ_mate >= 20 & nchar(as.vector(dd$read2)) >= 80 & !dd$chr_final %in% c('2_endogenous','4_endogenous','9_endogenous') & dd$Prop_mate_mapped > 0.8)
+  idx = which(dd$MAPQ_mate >= 20 & nchar(as.vector(dd$read2)) >= 60 & !dd$chr_final %in% c('2_endogenous','4_endogenous','9_endogenous'))
   
   # Type of fusions
   dd$type_fus = "fusion"
@@ -428,12 +430,12 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   ##-----------------------
   # Remove reads with inconsistent mate mapping read
   # With low mapping quality
-  # Long ones and without lots of hard-clip bases (more than 80 bps)
+  # Long ones and without lots of hard-clip bases (more than 60 bps)
   # Without telomeric repeats
   # Not in endogenous
   # To remove fusions with unknown mate sequence without telomeric repeats
   ##-----------------------
-  idx = which(dd$telo_repeats_mate == "No" & dd$MAPQ_mate < 20 & nchar(as.vector(dd$read2)) >= 80 & !dd$chr_final %in% c('2_endogenous','4_endogenous','9_endogenous') & dd$type_fus == 'fusion')
+  idx = which(dd$telo_repeats_mate == "No" & dd$MAPQ_mate < 20 & nchar(as.vector(dd$read2)) >= 60 & !dd$chr_final %in% c('2_endogenous','4_endogenous','9_endogenous') & dd$type_fus == 'fusion')
   
   # Type of fusions
   dd$mate_mapping = "expected_mate_mapping"
