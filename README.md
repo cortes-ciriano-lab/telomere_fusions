@@ -135,7 +135,4 @@ Output file:<br>
 - Collapsed_results/test.corrected.tsv: Final version of the telomere fusions obtained after middle correction. All fusions are collapsed by chromosome, middle sequence, and the different fusion subtype criteria (for each sample separately).<br>
 - Collapsed_results/test.proportion_correct_endo9.tsv: Table showing the proportion of reads annotated in endogenous_9 showing the expected TTAA middle sequence. It has as well the blacklist label information.<br>
 
-## Contact
-Please contact us for further information or suggestions:<br>
-Francesc Muyas: fmuyas@ebi.ac.uk
-Isidro Cortes-Ciriano: icortes@ebi.ac.uk
+
