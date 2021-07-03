@@ -118,21 +118,21 @@ Output file:<br>
 - QC/test.fusions.unfiltered.tsv: Updated summary file, with extra columns with the information used to perform the QC computation. It provides the QC decision for each read, as well as the reason because each read was filtered or not.<br>
 - QC/test.fusions.pass.tsv: List of reads supporting telomere fusions that passed all QC filters (PASS reads from QC/test.fusions.unfiltered.tsv file).<br>
 - QC/test.fusions.false_positives.tsv: List of reads supporting that did not pass the QC filters (Filtered reads from QC/test.fusions.unfiltered.tsv file).<br>
-- QC/test.fusions.pass.collapsed.tsv: List of reads supporting telomere fusions (only PASS reads) collapsed by chromosome, middle sequence, and the different fusion subtype criteria for each sample separately.<br>
+- QC/test.fusions.pass.collapsed.tsv: List of reads supporting telomere fusions (only PASS reads) collapsed by chromosome, breakpoint sequence, and the different fusion subtype criteria for each sample separately.<br>
 - QC/test.fusions.sample_stats.tsv: Summary table showing the number of reads supporting fusions found for each samples, as well as the reads of them that were filtered out.<br>
 - QCtest.fusions.QC.Rdata: R environment used in the computation (to be ignored by most of users).<br>
 
 
-## Step 6: middle sequence correction
+## Step 6: breakpoint sequence correction
 This script corrects the breakpoint sequences of the telomere fusions detected. The breakpoint sequence of a telomere fusion is the sequence flanked by the forward (TTAGGG) and reverse (CCCTAA) repeats.<br>
 
 ```R
 Rscript scripts/CollapseCorrectFusions.R --summary_file_collapsed QC/${sampleid}.fusions.pass.collapsed.tsv --outprefix Collapsed_results/${sampleid}
 ```
 Output file:<br>
-- Collapsed_results/Possible_middle_sequences.pure.tsv: All possible middle sequences that can be originated from the canonical fusion of two telomeres.<br>
-- Collapsed_results/test.middle_correction_steps.tsv: Different steps of the error correction showing how the middle sequence of each fusion has been curated.<br>
-- Collapsed_results/test.corrected.tsv: Final version of the telomere fusions obtained after middle correction. All fusions are collapsed by chromosome, middle sequence, and the different fusion subtype criteria (for each sample separately).<br>
-- Collapsed_results/test.proportion_correct_endo9.tsv: Table showing the proportion of reads annotated in endogenous_9 showing the expected TTAA middle sequence. It has as well the blacklist label information.<br>
+- Collapsed_results/Possible_breakpoint_sequences.pure.tsv: All possible breakpoint sequences that can be originated from the canonical fusion of two telomeres.<br>
+- Collapsed_results/test.breakpoint_correction_steps.tsv: Different steps of the error correction showing how the breakpoint sequence of each fusion has been curated.<br>
+- Collapsed_results/test.corrected.tsv: Final version of the telomere fusions obtained after breakpoint sequence correction. All fusions are collapsed by chromosome, breakpoint sequence, and the different fusion subtype criteria (for each sample separately).<br>
+- Collapsed_results/test.proportion_correct_endo9.tsv: Table showing the proportion of reads annotated in endogenous_9 showing the expected TTAA breakpoint sequence. It has as well the blacklist label information.<br>
 
 
