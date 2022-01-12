@@ -1,10 +1,13 @@
-# Detection of telomere fusions using sequencing data
-This repository provides functionalities for the detection of telomere fusions using whole-genome sequencing data.
+# TFDetector: detection of telomere fusions using sequencing data
+TFDetector provides functionalities for the detection of telomere fusions using whole-genome sequencing data.
 The pipeline, which is split into the 6 steps described below, requires an aligned bam file as input and a sample/run ID, which is used as prefix in the output files. For illustration purposes, we use below "test" as sample ID. 
 We provide a test bam file ("test.bam") with the repository for testing purposes.<br>
 The code can be run serially. However, for large files we recommend to run steps 2 and 3 below in parallel using subsets of the data as input (e.g. performing the analyses on a per chromosome basis).<br>
 
-## Installation and requirements
+# License
+**TFDetector is free for academic use only.** If you are not a member of a public funded academic and/or education and/or research institution you must obtain a commercial license from EMBL Enterprise Management GmbH (EMBLEM); please email EMBLEM (info@embl-em.de).
+
+# Installation and requirements
 The code requires python version >=3.7.0 and R version >=3.5.0.
 
 Please install the dependencies required by running:<br>
