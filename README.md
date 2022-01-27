@@ -138,7 +138,7 @@ Output file:<br>
 - Collapsed_results/test.corrected.tsv: Final version of the telomere fusions obtained after breakpoint sequence correction. All fusions are collapsed by chromosome, breakpoint sequence, and the different fusion subtype criteria (for each sample separately).<br>
 - Collapsed_results/test.proportion_correct_endo9.tsv: Table showing the proportion of reads annotated in endogenous_9 showing the expected TTAA breakpoint sequence. It has as well the blacklist label information.<br>
 
-# Contact
+# Contact
 If you have any comments or suggestions please raise an issue or contact us:
 Francesc Muyas: fmuyas@ebi.ac.uk
 Isidro Cortes-Ciriano: icortes@ebi.ac.uk
