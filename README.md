@@ -8,7 +8,7 @@ The code can be run serially. However, for large files we recommend to run steps
 **TelFusDetector is free for academic use only.** If you are not a member of a public funded academic and/or education and/or research institution you must obtain a commercial license from EMBL Enterprise Management GmbH (EMBLEM); please email EMBLEM (info@embl-em.de).
 
 # Installation and requirements
-The code requires python version >=3.7.0 and R version >=3.5.0.
+The code requires samtools (https://github.com/samtools/samtools), python version >=3.7.0 and R version >=3.5.0.
 
 Please install the dependencies required by running:<br>
 ```python
@@ -30,9 +30,9 @@ sampleid=test
 Output file:<br>
 Read alignemnt information, which will be used in Step 4. 
 
-## Step 2: extracting reads with telomere repeats (TTAGGG) and inverted telomere repeats (CCCTAA) allowing for one mismatch
+## Step 2: extracting reads with telomeric repeats (TTAGGG and CCCTAA) allowing for one mismatch
 
-From a bam file passed via stdin<br>
+From a bam file input via stdin<br>
 ```python
 samtools view test.bam | python scripts/fusion_caller.py --mode callfusions  --outprefix ${sampleid}
 ```
@@ -112,18 +112,18 @@ python scripts/fusion_caller.py --mode summarise --outprefix ${sampleid} --mates
 <br>
 
 ## Step 5: quality control (QC) step 
-This script provides functionalities to filter potential false positive telomere fusions, flag reads clearly mapping to regions of human genome containing telomere-like patterns (such as the relic of an ancestral telomere fusion in chr2), and further classify the fusions detected into categories according to the patters of repeats detected.<br>
+This script provides functionalities to filter potential false positive telomere fusions, flag reads mapping to regions of the human genome containing telomere fusion-like patterns (such as the relic of an ancestral telomere fusion in chr2), and further classify the fusions detected into categories according to the patterns of repeats detected.<br>
 
 ```R
 Rscript scripts/FusionReadsQC.R --summary_file ${sampleid}_fusions_summary --ref_genome Hg38 --outprefix QC/${sampleid} --read_length 150 
 ```
 Output file:<br>
-- QC/test.fusions.unfiltered.tsv: Updated summary file, with extra columns with the information used to perform the QC computation. It provides the QC decision for each read, as well as the reason because each read was filtered or not.<br>
+- QC/test.fusions.unfiltered.tsv: Updated summary file, with extra columns with the information used to perform the QC computation. It provides the QC decision for each read, as well as the reason underlying each decision.<br>
 - QC/test.fusions.pass.tsv: List of reads supporting telomere fusions that passed all QC filters (PASS reads from QC/test.fusions.unfiltered.tsv file).<br>
-- QC/test.fusions.false_positives.tsv: List of reads supporting that did not pass the QC filters (Filtered reads from QC/test.fusions.unfiltered.tsv file).<br>
-- QC/test.fusions.pass.collapsed.tsv: List of reads supporting telomere fusions (only PASS reads) collapsed by chromosome, breakpoint sequence, and the different fusion subtype criteria for each sample separately.<br>
-- QC/test.fusions.sample_stats.tsv: Summary table showing the number of reads supporting fusions found for each samples, as well as the reads of them that were filtered out.<br>
-- QCtest.fusions.QC.Rdata: R environment used in the computation (to be ignored by most of users).<br>
+- QC/test.fusions.false_positives.tsv: List of reads supporting telomere fusions that did not pass the QC filters (Filtered reads from QC/test.fusions.unfiltered.tsv file).<br>
+- QC/test.fusions.pass.collapsed.tsv: List of reads supporting telomere fusions (only PASS reads) collapsed by chromosome, breakpoint sequence and fusion subtype.<br>
+- QC/test.fusions.sample_stats.tsv: Summary table reporting the number of reads supporting fusions found for each sample, as well as the reads that were filtered out.<br>
+- QCtest.fusions.QC.Rdata: R environment used in the computation (to be ignored by most users).<br>
 
 
 ## Step 6: breakpoint sequence correction
@@ -134,9 +134,9 @@ Rscript scripts/CollapseCorrectFusions.R --summary_file_collapsed QC/${sampleid}
 ```
 Output file:<br>
 - Collapsed_results/Possible_breakpoint_sequences.pure.tsv: All possible breakpoint sequences that can be originated from the canonical fusion of two telomeres.<br>
-- Collapsed_results/test.breakpoint_correction_steps.tsv: Different steps of the error correction showing how the breakpoint sequence of each fusion has been curated.<br>
-- Collapsed_results/test.corrected.tsv: Final version of the telomere fusions obtained after breakpoint sequence correction. All fusions are collapsed by chromosome, breakpoint sequence, and the different fusion subtype criteria (for each sample separately).<br>
-- Collapsed_results/test.proportion_correct_endo9.tsv: Table showing the proportion of reads annotated in endogenous_9 showing the expected TTAA breakpoint sequence. It has as well the blacklist label information.<br>
+- Collapsed_results/test.breakpoint_correction_steps.tsv: Different steps of the error correction component showing how the breakpoint sequence of each fusion has been curated.<br>
+- Collapsed_results/test.corrected.tsv: Telomere fusions obtained after breakpoint sequence correction. All fusions are collapsed by chromosome, breakpoint sequence, and the fusion subtype.<br>
+- Collapsed_results/test.proportion_correct_endo9.tsv: Table reporting the proportion of reads annotated as endogenous_9 showing the expected TTAA breakpoint sequence.<br>
 
 # Contact
 If you have any comments or suggestions please raise an issue or contact us:
