@@ -19,7 +19,7 @@ Rscript r_requirements_install.R
 ```
 <br>
 
-## Step 1: extract sequencing coverage information
+## Step 1: extracting sequencing coverage information
 
 The first step consists of extracting read alignment information using samtools flagstat.<br>
 ```
@@ -61,7 +61,7 @@ done
 ```
 <br>
 
-## Step 3: extract the mates for the reads containing candidate telomere fusions
+## Step 3: extracting the mates for the reads containing candidate telomere fusions
 ```python
 samtools view test.bam | python scripts/fusion_caller.py --mode extractmates --outprefix ${sampleid}
 ```
@@ -93,7 +93,7 @@ done
 ```
 <br>
 
-## Step 4: generate a summary file containing the fusions and additional information
+## Step 4: generating a summary file containing the fusions and additional information
 ```python
 python scripts/fusion_caller.py --mode summarise --outprefix ${sampleid} --alignmentinfo ${sampleid}.cov
 ```
