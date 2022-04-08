@@ -20,6 +20,11 @@ options(warn=-1)
 # Function to detect the number of breakpoints in the middle sequence
 NUM_BREAKPOINTS <- function(SEQ, orientation){
   
+  # Replace known repeats
+  SEQ <- gsub(pattern = 'TTAGGG', replacement = '__fw__',x = SEQ)
+  SEQ <- gsub(pattern = 'CCCTAA', replacement = '__rv__',x = SEQ)
+  
+  # Replace old substitutions
   SEQ <- gsub(pattern = '_forward_', replacement = '__fw__',x = SEQ)
   SEQ <- gsub(pattern = '_reverse_', replacement = '__rv__',x = SEQ)
   
@@ -36,6 +41,70 @@ NUM_BREAKPOINTS <- function(SEQ, orientation){
   }
   
   return(length(ISLAND))
+}
+
+# Function to analyse mate read
+# It returns the number of times the middle in read 1 is found in the mate
+search_middle_in_mate_one_mismatch <- function(middle, seq, seq_mate, orientation){
+  
+  # Get original middle sequence
+  middle <- gsub(pattern = "_reverse_", replacement = 'CCCTAA', x = middle)
+  middle <- gsub(pattern = "_forward_", replacement = 'TTAGGG', x = middle)
+  
+  # Extend middle sequence
+  # 6 bp up and downstream
+  if (orientation == 'outward'){
+    middle_pat <- paste0("CCCTAACCCTAA",middle,"TTAGGGTTAGGG")
+  } else {
+    middle_pat <- paste0("TTAGGGTTAGGG",middle,"CCCTAACCCTAA")
+  }
+  
+  # Search for the original middle sequence
+  middle2 <- matchPattern(pattern = middle_pat, subject = seq,
+                          max.mismatch=8, min.mismatch=0,
+                          with.indels=FALSE, fixed=TRUE,
+                          algorithm="auto")
+  
+  # In case the match is found several times in the read
+  # We filter and clean them
+  if (length(middle2) > 1) {
+    middle2 <- middle2[nchar(middle2) == nchar(middle_pat)]
+    middle2 <- middle2[substr(middle2, 13, nchar(middle_pat)-12) == middle]
+    # Check each one of the two hexamers up- and down-stream of the middle sequence
+    if (orientation == 'outward'){
+      middle2 <- middle2[stringdist::stringdist(a = 'CCCTAA', b =substr(middle2, 1, 6),method = "hamming") <= 2 &
+                           stringdist::stringdist(a = 'CCCTAA', b = substr(middle2, 7, 12),method = "hamming") <= 2 &
+                           stringdist::stringdist(a = 'TTAGGG', b = substr(middle2, nchar(middle_pat)-12+1, nchar(middle_pat)-6),method = "hamming") <= 2 &
+                           stringdist::stringdist(a = 'TTAGGG', b = substr(middle2, nchar(middle_pat)-6+1, nchar(middle_pat)),method = "hamming") <= 2]
+    } else {
+      middle2 <- middle2[stringdist::stringdist(a = 'TTAGGG', b =substr(middle2, 1, 6),method = "hamming") <= 2 &
+                           stringdist::stringdist(a = 'TTAGGG', b = substr(middle2, 7, 12),method = "hamming") <= 2 &
+                           stringdist::stringdist(a = 'CCCTAA', b = substr(middle2, nchar(middle_pat)-12+1, nchar(middle_pat)-6),method = "hamming") <= 2 &
+                           stringdist::stringdist(a = 'CCCTAA', b = substr(middle2, nchar(middle_pat)-6+1, nchar(middle_pat)),method = "hamming") <= 2]
+    }
+  }
+  
+  # Let's search in the mate if we found the sequence of the middle properly
+  if (length(middle2) == 1){
+    SEQ <- as.character(middle2[[1]])
+    SEQ <- substr(SEQ, 7, nchar(middle_pat)-6)
+    
+    # Reverse complement the middle sequence
+    REV <- as.character(reverseComplement(DNAString(SEQ)))
+    
+    # Search the middle sequence in the mate using + and - strand
+    x <- DNAString(seq_mate)
+    Count1 <- countPattern(pattern = SEQ, subject = x, max.mismatch = 1, with.indels = T)
+    Count2 <- countPattern(pattern = REV, subject = x, max.mismatch = 1, with.indels = T)
+    
+    # Sum up the counts in one value
+    Count <- max(Count1,Count2)
+  } else if (length(middle2)  == 0){
+    Count <- -1
+  } else {
+    Count <- length(middle2) * (-1)
+  }
+  return(Count)
 }
 
 # Function to look for inversion-like fusions
@@ -126,9 +195,19 @@ MARK_ENDO_REGION <- function(DATA,CHROM,MIN_COORDINATE,MAX_COORDINATE,Flag_endo,
   # Flag the endogenous sequence in read of fusion
   DATA$chr =gsub("chr","",as.vector(DATA$chr))
   DATA$chr <- as.character(DATA$chr)
-  idx = which(DATA$chr == CHROM & 
-                DATA$pos >= MIN_COORDINATE & DATA$pos <= MAX_COORDINATE & 
-                DATA$MAPQ > 0 & DATA$orientation %in% orientation)
+  if (Flag_endo == '2_endogenous'){
+    idx1 = which(DATA$chr == CHROM & 
+                   DATA$pos >= MIN_COORDINATE & DATA$pos <= MAX_COORDINATE & 
+                   DATA$MAPQ >= 8 & DATA$orientation %in% orientation)
+    idx2 = which((grepl(pattern = 'TTGGGGTTGGGG', x = DATA$SEQ) | grepl(pattern = 'CCCCAACCCCAA', x = DATA$SEQ)) &
+                   grepl(pattern = 'TTAGCTAA', x = DATA$SEQ))
+    
+    idx = unique(c(idx1,idx2))
+  } else {
+    idx = which(DATA$chr == CHROM & 
+                  DATA$pos >= MIN_COORDINATE & DATA$pos <= MAX_COORDINATE & 
+                  DATA$MAPQ >= 8 & DATA$orientation %in% orientation)
+  }
   DATA$chr[idx] = Flag_endo
   
   # Flag the endogenous sequence in read mate
@@ -136,12 +215,14 @@ MARK_ENDO_REGION <- function(DATA,CHROM,MIN_COORDINATE,MAX_COORDINATE,Flag_endo,
   DATA$chr2 <- as.character(DATA$chr2)
   idx = which(DATA$chr2 == CHROM & 
                 DATA$PNEXT >= MIN_COORDINATE & DATA$PNEXT <= MAX_COORDINATE & 
-                DATA$MAPQ_mate > 0 & DATA$orientation %in% orientation)
+                DATA$MAPQ_mate >= 8 & DATA$orientation %in% orientation)
   
   DATA$chr2[idx] = Flag_endo
   
   return(DATA)
 }
+
+
 
 # Main function to run Quality Control (QC) step with summary files 
 MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
@@ -164,6 +245,20 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
 
   d <- unique(d)
   
+  # Remove wrong reads
+  d$MAPQ <- as.numeric(d$MAPQ)
+  d$MAPQ_mate <- as.numeric(d$MAPQ_mate)
+  d$pos <- as.numeric(d$pos)
+  d$pos2 <- as.numeric(d$pos2)
+  d$PNEXT <- as.numeric(d$PNEXT)
+  
+  d <- d[!is.na(d$MAPQ) & !is.na(d$MAPQ_mate),]
+  
+  if (nrow(d) < 1){
+    print(paste0(project, ' files are empty or not readable for the tool'))
+    return(list(fusions = NULL, stats = NULL))
+  }
+  
   # Clean sample name
   d$sample = gsub( "_rawFus_full_chr[0-9]_python.fq", "", d$sample)
   d$sample = gsub( "_rawFus_full_chrX_python.fq", "", d$sample)
@@ -171,6 +266,11 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   d$sample = gsub( "_rawFus_full_chr[(0-9)][(0-9)]_python.fq", "", d$sample)
   d$sample = gsub( "_rawFus_unmapped_python.fq", "", d$sample)
   d$sample = gsub( ".sorted", "", d$sample)
+  d$sample = gsub( ".sam", "", d$sample)
+  d$sample <- gsub(pattern = '.final.cram',replacement = '', x = d$sample)
+  d$sample <- gsub(pattern = '.recal.md',replacement = '', x = d$sample)
+  d$sample <- gsub(pattern = '.MD',replacement = '', x = d$sample)
+  d$sample <- gsub(pattern = '.cram',replacement = '', x = d$sample)
   
   d$project <- project
   
@@ -275,6 +375,7 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   
   dd <- MARK_ENDO_REGION(dd,CHROM,MIN_COORDINATE,MAX_COORDINATE,Flag_endo,orientation)
   
+  
   #-------------------
   # Substitute or mark chromosome, step 1
   #-------------------
@@ -293,6 +394,8 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   
   dd$FLAG1 <- apply(dd, 1, function(x) paste(FLAG_BITNAMES[ as.logical( bamFlagAsBitMatrix(as.integer(x['flag'])))],sep = ',', collapse = ','))
   dd$CODE <- with(dd, paste(sample,chr, pos, nchar(SEQ),RNEXT, PNEXT,nchar(read2), CIGAR, sep = '-'))
+  # Mark if read 1 (1 if yes)
+  dd$R1 <- (grepl(pattern = 'isFirstMate', x = dd$FLAG1))*1
   
   #------------------------
   # Fusion-like or inversion-like
@@ -359,12 +462,11 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
     }
   }
   
-  
   ##-----------------------
   # Mark reads which mate coordinates are wrong
   ##-----------------------
   if(nrow(dd) > 0){
-    dd$proper_mate <- !is.na(dd$pos2) & dd$pos2 == dd$PNEXT 
+    dd$proper_mate <- !is.na(dd$pos2) & !is.na(dd$pos) & !is.na(dd$PNEXT) & dd$pos2 == dd$PNEXT
     if (TRUE %in% dd$proper_mate){
       dd[dd$proper_mate == TRUE,]$proper_mate <- 'Correct_mate_found'
     }
@@ -385,26 +487,64 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   ##-----------------------
   
   # Check percentage of reads mapped per read
-  dd$Bases_mapped_read_from_CIGAR <- cigarWidthAlongQuerySpace(dd$CIGAR)
-  dd$Bases_mapped_mate_from_CIGAR <- cigarWidthAlongQuerySpace(dd$CIGAR_mate)
-  dd$Prop_read_mapped <- dd$Bases_mapped_read_from_CIGAR/nchar(dd$SEQ)
-  dd$Prop_mate_mapped <- dd$Bases_mapped_mate_from_CIGAR/nchar(dd$read2)
+  dd$Bases_mapped_read_from_CIGAR <- cigarWidthAlongQuerySpace(dd$CIGAR,before.hard.clipping = T)
+  dd$Bases_mapped_mate_from_CIGAR <- cigarWidthAlongQuerySpace(dd$CIGAR_mate,before.hard.clipping = T)
+  dd$Prop_read_mapped <- nchar(dd$SEQ)/dd$Bases_mapped_read_from_CIGAR
+  dd$Prop_mate_mapped <- nchar(dd$read2)/dd$Bases_mapped_mate_from_CIGAR
   
   # Get potential false positives
-  # Not in endogenous regions, mapped perfectly in non-telomeric regions (middle of chromosomes)
-  # We check afterwards if mates map to sub-telomeric regions
-  idx = which(dd$MAPQ_mate >= 20 & nchar(as.vector(dd$read2)) >= 60 & !dd$chr_final %in% c('2_endogenous','4_endogenous','9_endogenous'))
+  # Not in endogenous regions, with good mapping into non-telomeric regions (middle of chromosomes)
+  # We check afterwards if read wiith fusion maps to sub-telomeric regions
+  idx = which(dd$MAPQ >= 8 & nchar(as.vector(dd$SEQ)) >= 60 & !dd$chr_final %in% c('2_endogenous','4_endogenous','9_endogenous'))
   
   # Type of fusions
-  dd$type_fus = "fusion"
+  dd$type_fus1 = "fusion"
+  
+  if(length(idx) > 0){
+    
+    # Mark them as sub-telomeric 
+    fp_now =  dd[idx,]
+    fp_now$type_fus1="subtelomeric read"
+    
+    dd = dd[-idx,]
+    dd$type_fus1="fusion"
+    
+    # Now from the false positives, identify potential insertions of fusions, and fusions with the mate mapping to sub-telomeric regions
+    # Which ones map close to the beginning of the chr?
+    subtelo <- NULL
+    for (ff in 1:nrow(fp_now)){
+      if (REFERENCE == 'Hg38'){
+        endtelonow = telo_hg38$start[match(fp_now$chr[ff], telo_hg38$chr)]
+      } else{
+        endtelonow = telo_hg19$start[match(fp_now$chr[ff], telo_hg19$chr)]
+      }
+      
+      if( ((fp_now$pos[ff] < 100000) |  (fp_now$pos[ff] > endtelonow) ) & !is.na(endtelonow)){
+        subtelo = rbind.fill(subtelo, fp_now[ff,])
+        dd = rbind(dd, fp_now[ff,])
+        
+      } else{
+        fp_now[ff,]$type_fus1 <- 'chromosomic read'
+        dd = rbind(dd, fp_now[ff,])
+      }
+    }
+  } 
+  
+  # Now in mate
+  # Not in endogenous regions, with good mapping into non-telomeric regions (middle of chromosomes)
+  # We check afterwards if mates map to sub-telomeric regions
+  idx = which(dd$MAPQ_mate >= 8 & nchar(as.vector(dd$read2)) >= 60 & !dd$chr_final %in% c('2_endogenous','4_endogenous','9_endogenous'))
+  
+  # Type of fusions
+  dd$type_fus2 = "fusion"
   
   if(length(idx) > 0){
     
     # Mark them as subtelomeric 
     fp_now =  dd[idx,]
-    fp_now$type_fus="subtelomeric"
+    fp_now$type_fus2="subtelomeric mate"
     dd = dd[-idx,]
-    dd$type_fus="fusion"
+    dd$type_fus2="fusion"
     
     # Now from the false positives, identify potential insertions of fusions, and fusions with the mate mapping to sub-telomeric regions
     # Which ones map close to the beginning of the chr?
@@ -421,7 +561,7 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
         dd = rbind(dd, fp_now[ff,])
         
       } else{
-        fp_now[ff,]$type_fus <- 'chromosomic mate'
+        fp_now[ff,]$type_fus2 <- 'chromosomic mate'
         dd = rbind(dd, fp_now[ff,])
       }
     }
@@ -430,12 +570,12 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   ##-----------------------
   # Remove reads with inconsistent mate mapping read
   # With low mapping quality
-  # Long ones and without lots of hard-clip bases (more than 60 bps)
+  # Long ones and without lots of hard-clip bases (more than 80 bps)
   # Without telomeric repeats
   # Not in endogenous
   # To remove fusions with unknown mate sequence without telomeric repeats
   ##-----------------------
-  idx = which(dd$telo_repeats_mate == "No" & dd$MAPQ_mate < 20 & nchar(as.vector(dd$read2)) >= 60 & !dd$chr_final %in% c('2_endogenous','4_endogenous','9_endogenous') & dd$type_fus == 'fusion')
+  idx = which(dd$telo_repeats_mate == "No" & dd$MAPQ_mate < 8 & nchar(as.vector(dd$read2)) >= 60 & !dd$chr_final %in% c('2_endogenous','4_endogenous','9_endogenous') & dd$type_fus1 == 'fusion' & dd$type_fus2 == 'fusion')
   
   # Type of fusions
   dd$mate_mapping = "expected_mate_mapping"
@@ -448,6 +588,144 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   }
   
   ##-----------------------
+  # Analyse mate reads
+  # Check number of breakpoints in mate
+  # Check if middle sequence in read 1 is found in mate
+  ##-----------------------
+  
+  # Substitute Fwd and Rev Telomere Repeats in mate sequence
+  dd$read2.2 <- gsub(pattern = 'TTAGGG', replacement = '__fw__',x = dd$read2)
+  dd$read2.2 <- gsub(pattern = 'CCCTAA', replacement = '__rv__',x = dd$read2.2)
+  
+  # Get orientation of mate
+  dd$orientation_mate <- apply(dd,1,function(x) if (grepl(pattern = '__fw__[ACTGN]*__rv__', x = x['read2.2'])){
+    'end-to-head'
+  } else if (grepl(pattern = '__rv__[ACTGN]*__fw__', x = x['read2.2'])) {
+    'outward'
+  } else {
+    'no_orientation'
+  })
+  
+  # Get number of break points in mate
+  # For inward (end-to-head) and outward separately
+  dd$Inward_breakpoint_count_mate <- str_count(string = dd$read2.2, pattern = '__fw__[ACTGN]*__rv__')
+  dd$Outward_breakpoint_count_mate <- str_count(string = dd$read2.2, pattern = '__rv__[ACTGN]*__fw__')
+  dd$Total_breakpoint_count_mate <- dd$Inward_breakpoint_count_mate + dd$Outward_breakpoint_count_mate
+  
+  # Search middle sequence in read 1 in mate
+  # It is useful to check overlapping reads (it considers rev-comp)
+  # middle_in_mate_count > 0 : Number of time that the middle was found in mate
+  # middle_in_mate_count = 0 : Middle not found in mate
+  # middle_in_mate_count = -1 : Middle in read one wrong
+  # middle_in_mate_count < -1 : Number of time middle sequence is found in Read1
+  dd$middle_in_mate_count <- apply(dd,1,function(x) search_middle_in_mate_one_mismatch(as.character(x['middle']),as.character(x['SEQ']),as.character(x['read2']),as.character(x['orientation'])))
+  dd$middle_check <- apply(dd, 1, function(x) if (as.numeric(x['middle_in_mate_count']) < -1){
+    'Multiple_middle_in_read1'
+  } else if (as.numeric(x['middle_in_mate_count']) == -1) {
+    'Middle_problem_in_read1'
+  } else if (as.numeric(x['middle_in_mate_count']) == 0) {
+    'No_middle_in_read2'
+  } else if (as.numeric(x['middle_in_mate_count']) == 1) {
+    'Middle_in_read2'
+  } else if (as.numeric(x['middle_in_mate_count']) > 1) {
+    'Multiple_middle_in_read2'
+  } else {
+    'Other'
+  }
+  )
+  
+  dd$Pair_comp <- apply(dd,1,function(x) if (x['middle_check'] %in% c('Other','Multiple_middle_in_read1','Multiple_middle_in_read2','Middle_problem_in_read1')){
+    x['middle_check']
+  } else if (x['Total_breakpoint_count_mate'] > 1){
+    'Multiple_breakpoints_in_read2'
+  } else if (x['Total_breakpoint_count_mate'] < 1) {
+    'No_breakpoints_in_read2'
+  } else if (x['Total_breakpoint_count_mate'] == 1) {
+    if (x['middle_check'] == 'No_middle_in_read2' & x['orientation'] == x['orientation_mate']){
+      'No_middle_same_TF_orient'
+    } else if (x['middle_check'] == 'Middle_in_read2' & x['orientation'] == x['orientation_mate']){
+      'Same_middle_same_TF_orient'
+    } else if (x['orientation'] != x['orientation_mate']) {
+      'In-out'
+    } else {
+      'Other'
+    }
+  } else {
+    'Other'
+  }
+  )
+  
+  
+  ##-----------------------
+  # Analyse mate reads
+  # Check number of breakpoints in mate
+  # Check if middle sequence in read 1 is found in mate
+  ##-----------------------
+  
+  # Substitute Fwd and Rev Telomere Repeats in mate sequence
+  dd$read2.2 <- gsub(pattern = 'TTAGGG', replacement = '__fw__',x = dd$read2)
+  dd$read2.2 <- gsub(pattern = 'CCCTAA', replacement = '__rv__',x = dd$read2.2)
+  
+  # Get orientation of mate
+  dd$orientation_mate <- apply(dd,1,function(x) if (grepl(pattern = '__fw__[ACTGN]*__rv__', x = x['read2.2'])){
+    'end-to-head'
+  } else if (grepl(pattern = '__rv__[ACTGN]*__fw__', x = x['read2.2'])) {
+    'outward'
+  } else {
+    'no_orientation'
+  })
+  
+  # Get number of break points in mate
+  # For inward (end-to-head) and outward separately
+  dd$Inward_breakpoint_count_mate <- str_count(string = dd$read2.2, pattern = '__fw__[ACTGN]*__rv__')
+  dd$Outward_breakpoint_count_mate <- str_count(string = dd$read2.2, pattern = '__rv__[ACTGN]*__fw__')
+  dd$Total_breakpoint_count_mate <- dd$Inward_breakpoint_count_mate + dd$Outward_breakpoint_count_mate
+  
+  # Search middle sequence in read 1 in mate
+  # It is useful to check overlapping reads (it considers rev-comp)
+  # middle_in_mate_count > 0 : Number of time that the middle was found in mate
+  # middle_in_mate_count = 0 : Middle not found in mate
+  # middle_in_mate_count = -1 : Middle in read one wrong
+  # middle_in_mate_count < -1 : Number of time middle sequence is found in Read1
+  dd$middle_in_mate_count <- apply(dd,1,function(x) search_middle_in_mate_one_mismatch(as.character(x['middle']),as.character(x['SEQ']),as.character(x['read2']),as.character(x['orientation'])))
+  dd$middle_check <- apply(dd, 1, function(x) if (as.numeric(x['middle_in_mate_count']) < -1){
+    'Multiple_middle_in_read1'
+  } else if (as.numeric(x['middle_in_mate_count']) == -1) {
+    'Middle_problem_in_read1'
+  } else if (as.numeric(x['middle_in_mate_count']) == 0) {
+    'No_middle_in_read2'
+  } else if (as.numeric(x['middle_in_mate_count']) == 1) {
+    'Middle_in_read2'
+  } else if (as.numeric(x['middle_in_mate_count']) > 1) {
+    'Multiple_middle_in_read2'
+  } else {
+    'Other'
+  }
+  )
+  
+  dd$Pair_comp <- apply(dd,1,function(x) if (x['middle_check'] %in% c('Other','Multiple_middle_in_read1','Multiple_middle_in_read2','Middle_problem_in_read1')){
+    x['middle_check']
+  } else if (x['Total_breakpoint_count_mate'] > 1){
+    'Multiple_breakpoints_in_read2'
+  } else if (x['Total_breakpoint_count_mate'] < 1) {
+    'No_breakpoints_in_read2'
+  } else if (x['Total_breakpoint_count_mate'] == 1) {
+    if (x['middle_check'] == 'No_middle_in_read2' & x['orientation'] == x['orientation_mate']){
+      'No_middle_same_TF_orient'
+    } else if (x['middle_check'] == 'Middle_in_read2' & x['orientation'] == x['orientation_mate']){
+      'Same_middle_same_TF_orient'
+    } else if (x['orientation'] != x['orientation_mate']) {
+      'In-out'
+    } else {
+      'Other'
+    }
+  } else {
+    'Other'
+  }
+  )
+  
+  
+  ##-----------------------
   # Remove one of the mates when both show the same middle
   # Possibly caused because of small insert size
   ##-----------------------
@@ -457,53 +735,147 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   dd$READ_NAME_CODE <- with(dd, paste(sample,read_name,DUPLICATE,Supplementary,Secondary, sep = '-'))
   dd2 <- NULL
   
-  TABLE <- as.data.frame(table(dd$READ_NAME_CODE))
-  TABLE1 <- TABLE[TABLE$Freq < 2,]
-  TABLE2 <- TABLE[TABLE$Freq > 1,]
+  # Let's check for overlapping reads
+  # with two entries in the file
+  REPEATS <- dd %>%
+    dplyr::group_by(READ_NAME_CODE) %>%
+    dplyr::summarise(N = length(orientation),
+                     READ1 = length(unique(R1)),
+                     INFO = paste(unique(Pair_comp), collapse = ','),
+                     INFO_l = length(unique(Pair_comp)),
+                     Error_like = sum(Pair_comp %in% c('Middle_problem_in_read1','Multiple_breakpoints_in_read2','Multiple_middle_in_read1','Multiple_middle_in_read2','No_middle_same_TF_orient')))
   
-  dd2 <- dd[dd$READ_NAME_CODE %in% TABLE1$Var1,]
-  dd2$Paired_type <- 'Supported by one mate'
   
-  dd_temp <- dd[dd$READ_NAME_CODE %in% TABLE2$Var1,]
-  
-  for (read_code in unique(TABLE2$Var1)){
-    d_temp <- dd_temp[dd_temp$READ_NAME_CODE == read_code,]
-    
-    # If more than one mate counted
-    if (nrow(d_temp) > 1){
-      MIDDLE <- unique(d_temp$middle)
-      
-      if (length(MIDDLE) > 1){
-        d_temp$Paired_type <- 'Mate problems'
-        dd2 <- rbind(dd2,d_temp)
-      } else {
-        d_temp$Paired_type <- 'Supported by both mates (overlapping)'
-        
-        # We only keep one of them
-        d_temp1 <- d_temp[1,]
-        dd2 <- rbind(dd2,d_temp1)
-        
-        # Move the rest as FPs
-        d_temp2 <- d_temp[seq(2,nrow(d_temp)),]
-        d_temp2$Paired_type <- 'Supported by both mates (fragment already counted)'
-        dd2 <- rbind(dd2,d_temp2)
-      }
+  # Take a decision for this filter
+  REPEATS$Decision <- apply(REPEATS, 1, function(x) if (as.numeric(x['N']) < 2){
+    'Correct1'
+  } else if (as.numeric(x['N']) == 2){
+    if (as.numeric(x['Error_like']) > 0){
+      'Mate_problems'
     } else {
-      d_temp$Paired_type <- 'Supported by one mate'
-      dd2 <- rbind(dd2,d_temp)
+      'Correct2'
     }
+  } else {
+    'Other'
+  }
+  )
+  
+  # Split them in groups
+  # Supported by one mate
+  ONE_MATE <- REPEATS[REPEATS$Decision == 'Correct1',]
+  one_mate <- dd[dd$READ_NAME_CODE %in% ONE_MATE$READ_NAME_CODE,]
+  if (nrow(one_mate) > 0){
+    one_mate$Paired_type <- 'Correct'
+  }
+  
+  # Supported by both mates (only one must be counted)
+  BOTH_MATES <- REPEATS[REPEATS$Decision == 'Correct2' & !grepl(pattern = 'In-out',x = REPEATS$INFO),]
+  both_mate <- dd[dd$READ_NAME_CODE %in% BOTH_MATES$READ_NAME_CODE,]
+  if (nrow(both_mate) > 0){
+    # The one of both mates to be considered for downstream analysis
+    both_mate_included <- both_mate %>%
+      dplyr::group_by(READ_NAME_CODE) %>%
+      dplyr::slice(1)
+    both_mate_included$Paired_type <- 'Supported by both mates (overlapping)'
+    
+    # The one of both mates to be considered for downstream analysis
+    both_mate_ignored <- both_mate %>%
+      dplyr::group_by(READ_NAME_CODE) %>%
+      dplyr::slice(n())
+    both_mate_ignored$Paired_type <- 'Supported by both mates (fragment already counted)'
+    
+    # Merge results in one variable
+    both_mate <- as.data.frame(rbind(both_mate_included,both_mate_ignored))
+  }
+  
+  # Fusion found in both mates (in different orientation)
+  # Cirular-like
+  CIRCULAR_MATES <- REPEATS[REPEATS$Decision == 'Correct2' & grepl(pattern = 'In-out',x = REPEATS$INFO),]
+  circular_mate <- dd[dd$READ_NAME_CODE %in% CIRCULAR_MATES$READ_NAME_CODE,]
+  if (nrow(circular_mate) > 0){
+    # Mark circular mates (1 or 2)
+    circular_mate1 <- circular_mate %>%
+      dplyr::group_by(READ_NAME_CODE) %>%
+      dplyr::slice(1)
+    circular_mate1$Paired_type <- 'Circular-like (mate 1)'
+    circular_mate1$Subtype <- 'Circular-like (mate 1)'
+    
+    # Mark circular mates (1 or 2)
+    circular_mate2 <- circular_mate %>%
+      dplyr::group_by(READ_NAME_CODE) %>%
+      dplyr::slice(n())
+    circular_mate2$Paired_type <- 'Circular-like (mate 2)'
+    circular_mate2$Subtype <- 'Circular-like (mate 2)'
+    
+    # Merge results in one variable
+    circular_mate <- as.data.frame(rbind(circular_mate1,circular_mate2))
+  }
+  
+  # Mate problems
+  # Middle different between mates
+  # More than two mates
+  # Both read1 (or read2)
+  MATE_PROBLEMS <- REPEATS[REPEATS$Decision %in% c('Mate_problems','Other'),]
+  mate_problems <- dd[dd$READ_NAME_CODE %in% MATE_PROBLEMS$READ_NAME_CODE,]
+  if (nrow(mate_problems) > 0){
+    mate_problems$Paired_type <- 'Mate_problems'
+  }
+  
+  # Merge all in one
+  dd2 <- rbind(one_mate, both_mate,circular_mate,mate_problems)
+  
+  # Re-check In-out
+  idx = which(dd2$Pair_comp == 'In-out' & dd2$Paired_type == 'Correct')
+  in_out =  dd2[idx,]
+  if (nrow(in_out) > 0){
+    in_out$Paired_type <- 'Circular-like (mate 1)'
+  }
+  if(length(idx) > 0){
+    dd2 = dd2[-idx,]
+    dd2 <- rbind(dd2,in_out)
+  } else {
+    dd2 <- dd2
   }
   
   ##-----------------------
   # Change chromosome final 
   ##-----------------------
+  # Trusting mapping of the mate first, and read with fusion the second
   if (nrow(dd2) > 0){
-    dd2$chr_final <- apply(dd2, 1, function(x) if(!x['chr_final'] %in% c('2_endogenous','4_endogenous','9_endogenous') & x['type_fus'] %in% c('chromosomic mate','subtelomeric')) {
-      x['chr2']
-    } else if (x['chr_final'] %in% c('2_endogenous','4_endogenous','9_endogenous')){
+    dd2$chr_final <- apply(dd2, 1, function(x) if(x['chr_final'] %in% c('2_endogenous','4_endogenous','9_endogenous')){
       x['chr_final']
     } else {
-      'Unknown'
+      if (x['type_fus2'] %in% c('chromosomic mate')){
+        x['chr2']
+      } else if (x['type_fus1'] %in% c('chromosomic read')){
+        x['chr']
+      } else if (x['type_fus2'] %in% c('subtelomeric mate')){
+        x['chr2']
+      } else if (x['type_fus1'] %in% c('subtelomeric read')){
+        x['chr']
+      } else {
+        'Unknown'
+      }
+    }
+    )
+  }
+  
+  # General subtype
+  if (nrow(dd2) > 0){
+    dd2$type_fus <- apply(dd2, 1, function(x) if(x['chr_final'] %in% c('2_endogenous','4_endogenous','9_endogenous')){
+      x['chr_final']
+    } else {
+      if (x['type_fus2'] %in% c('chromosomic mate')){
+        gsub(pattern = ' mate', replacement = '', x = x['type_fus2'])
+      } else if (x['type_fus1'] %in% c('chromosomic read')){
+        gsub(pattern = ' read', replacement = '', x = x['type_fus1'])
+      } else if (x['type_fus2'] %in% c('subtelomeric mate')){
+        gsub(pattern = ' mate', replacement = '', x = x['type_fus2'])
+      } else if (x['type_fus1'] %in% c('subtelomeric read')){
+        gsub(pattern = ' read', replacement = '', x = x['type_fus1'])
+      } else {
+        'fusion'
+      }
     }
     )
   }
@@ -513,31 +885,11 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   ##-----------------------
   dd <- dd2
   if(nrow(dd)>0){
-    #print("Check mates with repeats forward and reverse. Ignoring overlapping mates showing the same middle")
-    idx = which(!dd$chr_final %in% c('2_endogenous','4_endogenous','9_endogenous') & 
-                  dd$Paired_type == "Supported by one mate" & 
-                  dd$forward_mate > 0 & dd$reverse_mate > 0 &
-                  !(dd$RNEXT == '=' & abs(dd$pos - dd$PNEXT) < 75))
-    
-    # Update false positives
-    fp_now =  dd[idx,]
-    if (nrow(fp_now) > 0){
-      fp_now$Paired_type <- 'Mate problems'
-    }
-    
-    # Keep good ones
-    if(length(idx) > 0){
-      dd = dd[-idx,]
-      dd <- rbind(dd,fp_now)
-    } else {
-      dd <- dd
-    }
-    
     ##-----------------
     # Filter column
     ##-----------------
     if (nrow(dd) > 0){
-      dd$Filter <- with(dd, paste(DUPLICATE,Supplementary,Secondary,Num_breakpoints,Subtype,proper_mate,type_fus,mate_mapping,Paired_type, sep = ','))
+      dd$Filter <- with(dd, paste(DUPLICATE,Supplementary,Secondary,Num_breakpoints,Subtype,proper_mate,type_fus,Pair_comp,Paired_type,type_fus1,type_fus2,mate_mapping, sep = ','))
       
       dd$Filter <- gsub(pattern = ",Supported by one mate$",replacement = '', x = dd$Filter)
       dd$Filter <- gsub(pattern = ",Supported by both mates \\(overlapping\\)$",replacement = '', x = dd$Filter)
@@ -545,12 +897,19 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
       dd$Filter <- gsub(pattern = "9_endogenous,",replacement = '', x = dd$Filter)
       dd$Filter <- gsub(pattern = "2_endogenous,",replacement = '', x = dd$Filter)
       dd$Filter <- gsub(pattern = "4_endogenous,",replacement = '', x = dd$Filter)
+      dd$Filter <- gsub(pattern = "Other,",replacement = '', x = dd$Filter)
+      dd$Filter <- gsub(pattern = "Circular-like \\(mate 1\\)",replacement = '', x = dd$Filter)
+      dd$Filter <- gsub(pattern = "Circular-like \\(mate 2\\)",replacement = '', x = dd$Filter)
       dd$Filter <- gsub(pattern = "Fusion-like,",replacement = '', x = dd$Filter)
       dd$Filter <- gsub(pattern = "Inversion-like,",replacement = '', x = dd$Filter)
       dd$Filter <- gsub(pattern = "Correct,",replacement = '', x = dd$Filter)
+      dd$Filter <- gsub(pattern = "In-out,",replacement = '', x = dd$Filter)
+      dd$Filter <- gsub(pattern = "No_breakpoints_in_read2,",replacement = '', x = dd$Filter)
       dd$Filter <- gsub(pattern = "Correct_mate_found,",replacement = '', x = dd$Filter)
       dd$Filter <- gsub(pattern = "fusion",replacement = '', x = dd$Filter)
       dd$Filter <- gsub(pattern = "expected_mate_mapping",replacement = '', x = dd$Filter)
+      dd$Filter <- gsub(pattern = "subtelomeric read",replacement = '', x = dd$Filter)
+      dd$Filter <- gsub(pattern = "subtelomeric mate",replacement = '', x = dd$Filter)
       dd$Filter <- gsub(pattern = "subtelomeric",replacement = '', x = dd$Filter)
       dd$Filter <- gsub(pattern = ",+",replacement = ',', x = dd$Filter)
       dd$Filter <- gsub(pattern = "^,",replacement = '', x = dd$Filter)
@@ -562,10 +921,15 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
                                               x['Secondary'] == 'Correct' &
                                               x['Num_breakpoints'] == 'Num_breakpoints_middle=1' &
                                               x['proper_mate'] == 'Correct_mate_found' &
-                                              x['type_fus'] %in% c('fusion','subtelomeric') & 
+                                              x['type_fus'] %in% c('2_endogenous', '4_endogenous', '9_endogenous', 'fusion','subtelomeric') & 
                                               x['mate_mapping'] == "expected_mate_mapping" &
-                                              x['Subtype'] != 'Other' &
-                                              x['Paired_type'] %in% c('Supported by one mate','Supported by both mates (overlapping)')) {
+                                              !(x['Subtype'] == 'No_repeats_mate' & x['type_fus'] == 'fusion') & 
+                                              !x['Pair_comp'] %in% c('Middle_problem_in_read1','Multiple_breakpoints_in_read2','Multiple_middle_in_read1','Multiple_middle_in_read2','No_middle_same_TF_orient') &
+                                              x['Paired_type'] %in% c('Correct',
+                                                                      'Supported by one mate',
+                                                                      'Supported by both mates (overlapping)',
+                                                                      'Circular-like (mate 1)',
+                                                                      'Circular-like (mate 2)')) {
         "PASS"
       } else {
         'False_Positive'
@@ -575,7 +939,7 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
       # Final print
       Read_lengths <- c(nchar(dd[!is.na(dd$SEQ),]$SEQ),nchar(dd[!is.na(dd$SEQ) & !is.na(dd$MAPQ_mate),]$SEQ))
       READ_length_mean <- round(mean(Read_lengths, na.rm = T),2)
-      READ_length_approx <- round_any(READ_length_mean - 1, 5, ceiling)
+      READ_length_approx <- max(nchar(dd$SEQ),nchar(dd$read2), na.rm = T)
       print (paste0('Number of samples with fusions: ', length(unique(dd$sample))))
       print (paste0('Number of original fusion calls: ', nrow(dd)))
       print (paste0('Number of pass fusion calls: ', sum(dd$PASS == 'PASS')))
@@ -597,7 +961,7 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
       dd$coverage <- dd$read_length*dd$Total_reads_used/3000000000
       
       # Filtering data.frame
-      STATS_temp <- data.frame(project = project, N_samples_with_fusions = length(unique(dd$sample)), Mean_read_length = READ_length_mean, Read_length_approx = READ_length_approx, raw_fusion_reads = nrow(dd),
+      STATS_temp <- data.frame(project = project, N_samples_with_fusions = length(unique(dd$sample)), Mean_read_length = READ_length_mean, Max_read_length = READ_length_approx, raw_fusion_reads = nrow(dd),
                                pass_fusion_reads = sum(dd$PASS == 'PASS'), fp_fusion_reads = sum(dd$PASS != 'PASS'), markduplicates = CHECK)
     }
   } else {
@@ -610,6 +974,7 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
 #-------
 # Telomeric regions
 #-------
+
 # https://blog.gene-test.com/telomeric-regions-of-the-human-genome/
 # Hg19 reference genome
 telo_hg19 = data.frame(c("1","10","11","12","13","14","15","16","18","19","2","20","21","22","3","4","5","6","7","8","9","X","Y"),
