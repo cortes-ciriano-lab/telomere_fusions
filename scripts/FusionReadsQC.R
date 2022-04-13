@@ -12,6 +12,7 @@ suppressPackageStartupMessages(library(Rsamtools))
 suppressPackageStartupMessages(library(stringr))
 suppressPackageStartupMessages(library(tibble))
 suppressPackageStartupMessages(library(argparse))
+suppressPackageStartupMessages(library(stringdist))
 options(warn=-1)
 #-------
 # Function to run the QC fusion detection step
