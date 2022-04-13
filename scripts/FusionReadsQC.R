@@ -7,6 +7,7 @@
 #-------
 suppressPackageStartupMessages(library(data.table))
 suppressPackageStartupMessages(library(plyr))
+suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(GenomicAlignments))
 suppressPackageStartupMessages(library(Rsamtools))
 suppressPackageStartupMessages(library(stringr))
