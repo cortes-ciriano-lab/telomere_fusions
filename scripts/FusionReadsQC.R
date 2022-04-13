@@ -509,7 +509,6 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
     fp_now$type_fus1="subtelomeric read"
     
     dd = dd[-idx,]
-    dd$type_fus1="fusion"
     
     # Now from the false positives, identify potential insertions of fusions, and fusions with the mate mapping to sub-telomeric regions
     # Which ones map close to the beginning of the chr?
@@ -546,7 +545,6 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
     fp_now =  dd[idx,]
     fp_now$type_fus2="subtelomeric mate"
     dd = dd[-idx,]
-    dd$type_fus2="fusion"
     
     # Now from the false positives, identify potential insertions of fusions, and fusions with the mate mapping to sub-telomeric regions
     # Which ones map close to the beginning of the chr?
