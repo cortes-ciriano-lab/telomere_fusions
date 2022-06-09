@@ -237,7 +237,7 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   d <- tryCatch(read.table(file, sep = '\t', header = F), error=function(e) NULL)
 
   # Check if empty files
-  if (is.null(d) < 1){
+  if (is.null(d)){
     print(paste0('Warning: ',project, ' files are empty or not readable for the tool'))
     return(list(fusions = NULL, stats = NULL))
   }
