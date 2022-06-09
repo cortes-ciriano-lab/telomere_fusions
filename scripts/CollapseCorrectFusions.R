@@ -819,7 +819,7 @@ outfile0 <- paste(outf, 'Possible_middle_sequences.pure.tsv', sep = '/')
 write.table(x = PURE_MIDDLE, file = outfile0,sep = '\t', quote = F, row.names = F, col.names = T)
 
 # 3. Perform fusion correction
-telo <- as.data.frame(fread(file))
+telo <- read.table(file,sep='\t',header=T)
 if (nrow(telo) > 0){
   # 4. Main correction
   telo_corrected <- MainCorrection(telo,PURE_MIDDLE)
