@@ -234,9 +234,12 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   print(paste0('Project: ', project))
   
   # Load project file and add header
-  d = read.table(file, sep = '\t', header = F)
-  if (nrow(d) > 0){
-    names(d) <- HEADER
+  d <- tryCatch(read.table(file, sep = '\t', header = F), error=function(e) NULL)
+
+  # Check if empty files
+  if (is.null(d) < 1){
+    print(paste0('Warning: ',project, ' files are empty or not readable for the tool'))
+    return(list(fusions = NULL, stats = NULL))
   }
   
   # Check if empty files
@@ -245,6 +248,11 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
     return(list(fusions = NULL, stats = NULL))
   }
 
+  # Add colnames                
+  if (nrow(d) > 0){
+    names(d) <- HEADER
+  }
+                
   d <- unique(d)
   
   # Remove wrong reads
