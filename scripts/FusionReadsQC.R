@@ -234,7 +234,7 @@ MAIN_FUNCTION_FUSION_QC <- function(file, project,REFERENCE, read_length){
   print(paste0('Project: ', project))
   
   # Load project file and add header
-  d = as.data.frame(fread(file, sep = '\t', header = F))
+  d = read.table(file, sep = '\t', header = F)
   if (nrow(d) > 0){
     names(d) <- HEADER
   }
