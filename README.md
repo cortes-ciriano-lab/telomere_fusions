@@ -83,13 +83,20 @@ done
 bsub -o o.log -e e.log -J ${sampleid}job -M 2G "samtools view -f 4 test.bam | python scripts/fusion_caller.py --mode extractmates  --outprefix ${sampleid}_unmapped"
 ```
 
-When running in parallel, merge the read IDs into a single file:<br>
+When running in parallel, merge the read IDs and fusions into a single file:<br>
 ```bash
 touch ${sampleid}_mates
 for chr in {1..22} X Y unmapped
 do
 cat ${sampleid}_${chr}_mates >> ${sampleid}_mates
 done
+
+touch ${sampleid}_fusions
+for chr in {1..22} X Y unmapped
+do
+cat ${sampleid}_${chr}_fusions >> ${sampleid}_fusions
+done
+
 ```
 <br>
 
