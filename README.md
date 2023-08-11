@@ -1,4 +1,7 @@
 # TelFusDetector: detection of telomere fusions using sequencing data
+
+**IMPORTANT NOTICE:** This GitHub repository presents the old version of TelFusDetector. For the newer version, which is much faster,  entirely written in *python* and executable in a single command, please take a look at the [new version of TelFusDetector.](https://github.com/cortes-ciriano-lab/TelFusDetector) 
+
 TelFusDetector provides functionalities for the detection of telomere fusions using whole-genome sequencing data.
 The pipeline, which is split into the 6 steps described below, requires an aligned bam file as input and a sample/run ID, which is used as prefix in the output files. For illustration purposes, we use below "test" as sample ID. 
 We provide a test bam file ("test.bam") with the repository for testing purposes.<br>
